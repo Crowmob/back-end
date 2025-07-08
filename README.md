@@ -2,5 +2,5 @@
 
 ## Run with command
     
-    uvicorn app.main:app --reload
+    python -m app.main
     
