@@ -7,7 +7,11 @@ app = FastAPI(
 
 @app.get("/")
 def main():
-    return {"message": "Hello"}
+    return {
+        "status_code": 200,
+        "detail": "ok",
+        "result": "working"
+    }
 
 if __name__ == "__main__":
     import uvicorn
