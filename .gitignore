@@ -2,4 +2,4 @@ venv
 .env
 .pytest_cache
 .idea
-pycache
+__pycache__
