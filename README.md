@@ -2,5 +2,5 @@
 
 ## Run with command
     
-    python -m app.main
+    docker-compose up
     
