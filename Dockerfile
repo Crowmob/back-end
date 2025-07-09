@@ -11,5 +11,5 @@ EXPOSE ${PORT}
 ENV HOST=${HOST}
 ENV PORT=${PORT}
 
-CMD "uvicorn" "app.main:app" "--host" $HOST "--port" $PORT "--reload"
+CMD ["python", "-m", "app.main"]
 
