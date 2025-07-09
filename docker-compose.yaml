@@ -10,5 +10,31 @@ services:
       - .env
     environment:
       - ${HOST}
+      - DB_URL=${POSTGRES_URL}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+    depends_on:
+      - db
+      - redis
     volumes:
       - ./:/app
+  redis:
+    image: redis:latest
+    container_name: redis-container
+    ports:
+      - ${REDIS_PORT}:${REDIS_PORT}
+  db:
+    image: postgres:17
+    container_name: postgres-container
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - ${POSTGRES_PORT}:${POSTGRES_PORT}
+volumes:
+  pgdata:

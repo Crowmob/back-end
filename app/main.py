@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+
 from app.routers.main_router import main_router
 from app.core.settings_model import settings
 
