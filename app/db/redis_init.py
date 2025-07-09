@@ -1,4 +1,12 @@
-from redis.asyncio import Redis
+import redis.asyncio as redis
+
 from app.core.settings_model import settings
 
-redis_client = Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+pool = redis.ConnectionPool(
+    host=settings.redis.HOST,
+    port=settings.redis.PORT
+)
+
+
+def get_redis_client():
+    return redis.Redis(connection_pool=pool)

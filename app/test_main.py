@@ -1,9 +1,10 @@
 from fastapi.testclient import TestClient
-from app.main import app
-from app.db.postgres_init import *
-from app.db.redis_init import redis_client
 from sqlalchemy import text
 import pytest
+
+from app.main import app
+from app.db.postgres_init import async_session_maker
+from app.db.redis_init import get_redis_client
 
 client = TestClient(app)
 
@@ -27,6 +28,6 @@ async def test_postgres():
 
 @pytest.mark.asyncio
 async def test_redis():
-    data = await redis_client.get("id:1")
+    data = await get_redis_client().get("id:1")
     decoded_data = data.decode()
     assert decoded_data == "hello"
