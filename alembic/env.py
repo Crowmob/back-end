@@ -1,9 +1,9 @@
 import asyncio
-from logging.config import fileConfig
 import os
+from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from alembic import context
 from dotenv import load_dotenv
 
@@ -12,13 +12,11 @@ from app.db.models import Base
 load_dotenv()
 
 config = context.config
-
 config.set_main_option("sqlalchemy.url", os.getenv("POSTGRES_URL"))
 
 fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
-
 
 def run_migrations_offline():
     url = config.get_main_option("sqlalchemy.url")
@@ -34,11 +32,9 @@ def run_migrations_offline():
 
 
 async def run_migrations_online():
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
+    connectable = create_async_engine(
+        config.get_main_option("sqlalchemy.url"),
         poolclass=pool.NullPool,
-        future=True,
     )
 
     async with connectable.connect() as connection:
@@ -58,4 +54,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     asyncio.run(run_migrations_online())
-
