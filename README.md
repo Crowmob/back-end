@@ -17,6 +17,36 @@
 
 ```bash
 docker-compose up
+```
+
+## Database Migrations
+### Initialize Alembic
+```bash
+alembic init elembic
+```
+### Configure Alembic
+1. Edit alembic.ini
+```bash
+sqlalchemy.url = db_url
+```
+2. Edit env.py
+```bash
+from app.db.models import Base
+target_metadata = Base.metadata
+```
+### Creating and Applying Migrations
+1. Autogenerate migration
+```bash 
+alembic revision --autogenerate -m "comment"
+```
+2. Apply Migrations
+```bash
+alembic upgrade head
+```
+or
+```bash
+alembic upgrade <revision_id>
+```
         
 
     

@@ -17,7 +17,7 @@ services:
       - db
       - redis
     volumes:
-      - ./:/app
+      - .:/app
   redis:
     image: redis:latest
     container_name: redis-container
