@@ -4,7 +4,6 @@ from typing import Optional, List
 
 
 class UserSchema(BaseModel):
-    id: int
     username: str
     email: str
     password: str
@@ -26,10 +25,10 @@ class SignUpRequestModel(BaseModel):
 
 
 class UserUpdateRequestModel(BaseModel):
-    username: Optional[str]
-    email: Optional[str]
-    password: Optional[str]
-    date_of_birth: Optional[date]
+    username: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    date_of_birth: Optional[date] = None
 
 
 class UsersListResponse(BaseModel):
@@ -43,4 +42,3 @@ class UserDetailResponse(BaseModel):
     date_of_birth: date
     gender: str
     created_at: date
-
