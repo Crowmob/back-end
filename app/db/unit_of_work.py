@@ -1,21 +1,29 @@
+from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.postgres_init import async_session_maker
 from app.db.repositories.user_repository import UserRepository
 
 
 class UnitOfWork:
-    def __init__(self):
+    def __init__(self, session: Optional[AsyncSession] = None):
+        self._external_session = session
         self.session = None
-        self.users: UserRepository = None
+        self.users = None
 
     async def __aenter__(self):
-        if not self.session:
-            self.session = async_session_maker()
-            self.session = await self.session.__aenter__()
+        if self._external_session:
+            self.session = self._external_session
+        else:
+            self._session_context = async_session_maker()
+            self.session = await self._session_context.__aenter__()
+
         self.users = UserRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.session.__aexit__(exc_type, exc_val, exc_tb)
+        if not self._external_session:
+            await self._session_context.__aexit__(exc_type, exc_val, exc_tb)
 
     async def commit(self):
         await self.session.commit()

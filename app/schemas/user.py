@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date
 from typing import Optional, List
 
@@ -9,6 +9,7 @@ class UserSchema(BaseModel):
     password: str
     date_of_birth: date
     gender: str
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SignInRequestModel(BaseModel):
@@ -29,6 +30,7 @@ class UserUpdateRequestModel(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
     date_of_birth: Optional[date] = None
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UsersListResponse(BaseModel):
