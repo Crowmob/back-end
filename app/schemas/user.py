@@ -1,6 +1,9 @@
 from pydantic import BaseModel, ConfigDict
+from pydantic.generics import GenericModel
 from datetime import date
-from typing import Optional, List
+from typing import Optional, List, Generic, TypeVar
+
+T = TypeVar("T")
 
 
 class UserSchema(BaseModel):
@@ -12,7 +15,7 @@ class UserSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class SignInRequestModel(BaseModel):
+class SignUpRequestModel(BaseModel):
     username: str
     email: str
     password: str
@@ -20,7 +23,7 @@ class SignInRequestModel(BaseModel):
     gender: str
 
 
-class SignUpRequestModel(BaseModel):
+class SignInRequestModel(BaseModel):
     username: str
     password: str
 
@@ -33,8 +36,9 @@ class UserUpdateRequestModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class UsersListResponse(BaseModel):
-    users: List[UserSchema]
+class ListResponse(GenericModel, Generic[T]):
+    items: List[T]
+    count: int
 
 
 class UserDetailResponse(BaseModel):
@@ -44,3 +48,4 @@ class UserDetailResponse(BaseModel):
     date_of_birth: date
     gender: str
     created_at: date
+    model_config = ConfigDict(from_attributes=True)

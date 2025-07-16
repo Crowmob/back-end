@@ -46,7 +46,7 @@ async def test_create_user(user_services):
 @pytest.mark.asyncio
 async def test_get_all_users(user_services):
     users_list = await user_services.get_all_users()
-    assert len(users_list.users) > 0
+    assert len(users_list.items) > 0
 
 
 @pytest.mark.asyncio

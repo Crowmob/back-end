@@ -3,18 +3,18 @@ from sqlalchemy.future import select
 from sqlalchemy import update, delete
 
 from app.db.models import User
-from app.schemas.user import UserSchema, UsersListResponse
+from app.schemas.user import UserSchema, ListResponse
 
 
 class UserRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_all_users(self) -> UsersListResponse:
+    async def get_all_users(self) -> ListResponse[UserSchema]:
         result = await self.session.execute(select(User))
         users = result.scalars().all()
-        return UsersListResponse(
-            users=[UserSchema.model_validate(user) for user in users]
+        return ListResponse[UserSchema](
+            items=[UserSchema.model_validate(user) for user in users], count=len(users)
         )
 
     async def get_user_by_id(self, user_id: int) -> UserSchema | None:
