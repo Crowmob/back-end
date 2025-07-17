@@ -36,6 +36,11 @@ class UserUpdateRequestModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class GetAllUsersRequestModel(BaseModel):
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+
+
 class ListResponse(GenericModel, Generic[T]):
     items: List[T]
     count: int

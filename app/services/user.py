@@ -2,7 +2,11 @@ import logging
 
 from app.db.unit_of_work import UnitOfWork
 from app.utils.password import hash_password
-from app.schemas.user import UserUpdateRequestModel, SignUpRequestModel
+from app.schemas.user import (
+    UserUpdateRequestModel,
+    SignUpRequestModel,
+    GetAllUsersRequestModel,
+)
 from app.core.exceptions import (
     UserNotFoundException,
     UserAlreadyExistsException,
@@ -13,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class UserServices:
-    async def create_user(self, user_data: SignUpRequestModel):
+    @staticmethod
+    async def create_user(user_data: SignUpRequestModel):
         user_data.password = hash_password(user_data.password)
         try:
             async with UnitOfWork() as uow:
@@ -28,13 +33,15 @@ class UserServices:
             )
             raise UserAlreadyExistsException(user_data.email)
 
-    async def get_all_users(self):
+    @staticmethod
+    async def get_all_users(data: GetAllUsersRequestModel):
         async with UnitOfWork() as uow:
-            users = await uow.users.get_all_users()
-        logger.info("Fetched all users")
+            users = await uow.users.get_all_users(data)
+        logger.info("Fetched users")
         return users
 
-    async def get_user_by_id(self, user_id: int):
+    @staticmethod
+    async def get_user_by_id(user_id: int):
         async with UnitOfWork() as uow:
             user = await uow.users.get_user_by_id(user_id)
         if not user:

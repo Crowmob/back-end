@@ -3,7 +3,7 @@ import pytest, pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from fastapi import HTTPException
 
-from app.schemas.user import UserSchema, UserUpdateRequestModel
+from app.schemas.user import UserSchema, UserUpdateRequestModel, GetAllUsersRequestModel
 from app.services.user import UserServices
 from app.db.unit_of_work import UnitOfWork
 from app.core.settings_model import settings
@@ -45,8 +45,9 @@ async def test_create_user(user_services):
 
 @pytest.mark.asyncio
 async def test_get_all_users(user_services):
-    users_list = await user_services.get_all_users()
-    assert len(users_list.items) > 0
+    data = GetAllUsersRequestModel(limit=1)
+    users_list = await user_services.get_all_users(data)
+    assert len(users_list.items) == 1
 
 
 @pytest.mark.asyncio
