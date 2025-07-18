@@ -3,11 +3,11 @@ import os
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 from dotenv import load_dotenv
 
-from app.db.models import Base
+from app.models.user_model import Base
 
 load_dotenv()
 
@@ -17,6 +17,7 @@ config.set_main_option("sqlalchemy.url", os.getenv("POSTGRES_URL"))
 fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
 
 def run_migrations_offline():
     url = config.get_main_option("sqlalchemy.url")

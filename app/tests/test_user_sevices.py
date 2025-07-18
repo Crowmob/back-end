@@ -33,20 +33,20 @@ def user_services(session, monkeypatch):
 async def test_create_user(user_services):
     user_data = UserSchema(
         username="testname1",
-        email="test1@mail.com",
+        email="test@mail.com",
         password="1234",
-        date_of_birth="2000-01-01",
-        gender="male",
     )
     global user_id
-    user_id = await user_services.create_user(user_data)
+    user_id = await user_services.create_user(
+        user_data.username, user_data.email, user_data.password
+    )
     assert type(user_id) == int
 
 
 @pytest.mark.asyncio
 async def test_get_all_users(user_services):
     data = GetAllUsersRequestModel(limit=1)
-    users_list = await user_services.get_all_users(data)
+    users_list = await user_services.get_all_users(data.limit, data.offset)
     assert len(users_list.items) == 1
 
 
@@ -58,8 +58,9 @@ async def test_get_user_by_id(user_services):
 
 @pytest.mark.asyncio
 async def test_update_user(user_services):
+    update_data = UserUpdateRequestModel(username="testname2")
     await user_services.update_user(
-        user_id, UserUpdateRequestModel(username="testname2")
+        user_id, update_data.username, update_data.email, update_data.password
     )
     user = await user_services.get_user_by_id(user_id)
     assert user.username == "testname2"

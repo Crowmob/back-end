@@ -7,11 +7,6 @@ from app.schemas.user import (
     SignUpRequestModel,
     UserUpdateRequestModel,
 )
-from app.core.exceptions import (
-    UserNotFoundException,
-    UserAlreadyExistsException,
-    UserUpdateException,
-)
 from app.schemas.user import UserDetailResponse, ListResponse
 
 user_router = APIRouter(tags=["User CRUD"])
@@ -20,23 +15,19 @@ user_services = UserServices()
 
 @user_router.get("/get_user_by_id", response_model=UserDetailResponse)
 async def get_user_by_id(user_id: int):
-    try:
-        return await user_services.get_user_by_id(user_id)
-    except UserNotFoundException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    return await user_services.get_user_by_id(user_id)
 
 
 @user_router.get("/get_all_users", response_model=ListResponse[UserDetailResponse])
 async def get_all_users(data: GetAllUsersRequestModel = Depends()):
-    return await user_services.get_all_users(data)
+    return await user_services.get_all_users(data.limit, data.offset)
 
 
 @user_router.post("/create_user")
 async def create_user(user_data: SignUpRequestModel):
-    try:
-        user_id = await user_services.create_user(user_data)
-    except UserAlreadyExistsException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    user_id = await user_services.create_user(
+        user_data.username, user_data.email, user_data.password
+    )
     return JSONResponse(
         status_code=200,
         content={"message": f"Created user successfully! id: {user_id}"},
@@ -45,12 +36,9 @@ async def create_user(user_data: SignUpRequestModel):
 
 @user_router.put("/update_user")
 async def update_user(user_id: int, update_data: UserUpdateRequestModel = Depends()):
-    try:
-        await user_services.update_user(user_id, update_data)
-    except UserNotFoundException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
-    except UserUpdateException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    await user_services.update_user(
+        user_id, update_data.username, update_data.email, update_data.password
+    )
     return JSONResponse(
         status_code=200,
         content={"message": f"Successfully updated user with id: {user_id}!"},
@@ -59,10 +47,7 @@ async def update_user(user_id: int, update_data: UserUpdateRequestModel = Depend
 
 @user_router.delete("/delete_user")
 async def delete_user(user_id: int):
-    try:
-        await user_services.delete_user(user_id)
-    except UserNotFoundException as e:
-        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    await user_services.delete_user(user_id)
     return JSONResponse(
         status_code=200,
         content={"message": f"Successfully deleted user with id: {user_id}!"},
