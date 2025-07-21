@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete
+from sqlalchemy import update, delete, func
 from typing import Optional
 
 from app.models.user_model import User
@@ -23,16 +23,19 @@ class UserRepository:
 
         result = await self.session.execute(stmt)
         users = result.scalars().all()
+
+        count_stmt = select(func.count()).select_from(User)
+        total_count = await self.session.scalar(count_stmt)
+
         return ListResponse[UserDetailResponse](
             items=[UserDetailResponse.model_validate(user) for user in users],
-            count=len(users),
+            count=total_count,
         )
 
     async def get_user_by_id(self, user_id: int) -> UserDetailResponse | None:
         result = await self.session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if user:
-            user.created_at = user.created_at.date()
             return UserDetailResponse.model_validate(user)
         return None
 

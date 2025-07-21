@@ -1,9 +1,13 @@
 import logging
 from typing import Optional
+from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from fastapi import HTTPException
 
 from app.db.unit_of_work import UnitOfWork
 from app.utils.password import hash_password
 from app.core.exceptions import (
+    AppException,
     UserNotFoundException,
     UserAlreadyExistsException,
     UserUpdateException,
@@ -22,32 +26,63 @@ class UserServices:
                 await uow.commit()
                 logger.info(f"User created: {username}")
                 return user_id
-            except:
+            except IntegrityError:
+                await uow.rollback()
                 logger.error(
                     f"Error creating user: User with email {email} already exists"
                 )
                 raise UserAlreadyExistsException(email)
 
+            except SQLAlchemyError as e:
+                await uow.rollback()
+                logger.info(f"SQLAlchemy error: {e}")
+                raise
+
+            except HTTPException as e:
+                await uow.rollback()
+                logger.info(f"Unexpected error: {e}")
+                raise AppException(e.detail, e.status_code)
+
     @staticmethod
     async def get_all_users(limit: Optional[int] = None, offset: Optional[int] = None):
         async with UnitOfWork() as uow:
-            users = await uow.users.get_all_users(limit, offset)
-            logger.info("Fetched users")
-            return users
+            try:
+                users = await uow.users.get_all_users(limit, offset)
+                logger.info("Fetched users")
+                return users
+
+            except SQLAlchemyError as e:
+                logger.info(f"SQLAlchemy error: {e}")
+                raise
+
+            except HTTPException as e:
+                logger.info(f"Unexpected error: {e}")
+                raise AppException(e.detail, e.status_code)
 
     @staticmethod
-    async def get_user_by_id(user_id: int):
+    async def get_user_by_id(user_id: int, existing_uow: Optional[UnitOfWork] = None):
         async with UnitOfWork() as uow:
-            user = await uow.users.get_user_by_id(user_id)
-            if not user:
-                logger.warning(f"No user found with id={user_id}")
-                raise UserNotFoundException(user_id)
-            logger.info(f"Fetched user with id={user_id}")
-            return user
+            if existing_uow:
+                uow = existing_uow
+            try:
+                user = await uow.users.get_user_by_id(user_id)
+                if not user:
+                    logger.warning(f"No user found with id={user_id}")
+                    raise UserNotFoundException(user_id)
+                logger.info(f"Fetched user with id={user_id}")
+                return user
+
+            except SQLAlchemyError as e:
+                logger.info(f"SQLAlchemy error: {e}")
+                raise
+
+            except HTTPException as e:
+                logger.info(f"Unexpected error: {e}")
+                raise AppException(e.detail, e.status_code)
 
     async def update_user(self, user_id: int, username: str, email: str, password: str):
-        await self.get_user_by_id(user_id)
         async with UnitOfWork() as uow:
+            await self.get_user_by_id(user_id, uow)
             if password:
                 password = hash_password(password)
             values_to_update = {
@@ -63,13 +98,36 @@ class UserServices:
                 await uow.commit()
 
                 logger.info(f"User updated: id={user_id}")
-            except:
-                logger.error(f"Error updating user id={user_id}: Wrong data")
+
+            except IntegrityError as e:
+                await uow.rollback()
+                logger.info(f"Integrity error: {e}")
                 raise UserUpdateException(user_id)
 
+            except SQLAlchemyError as e:
+                await uow.rollback()
+                logger.info(f"SQLAlchemy error: {e}")
+                raise AppException(detail="Database exception occurred.")
+
+            except HTTPException as e:
+                await uow.rollback()
+                logger.info(f"Unexpected error: {e}")
+                raise AppException(e.detail, e.status_code)
+
     async def delete_user(self, user_id: int):
-        await self.get_user_by_id(user_id)
         async with UnitOfWork() as uow:
-            await uow.users.delete_user(user_id)
-            await uow.commit()
-            logger.info(f"User deleted: id={user_id}")
+            await self.get_user_by_id(user_id, uow)
+            try:
+                await uow.users.delete_user(user_id)
+                await uow.commit()
+                logger.info(f"User deleted: id={user_id}")
+
+            except SQLAlchemyError as e:
+                await uow.rollback()
+                logger.info(f"SQLAlchemy error: {e}")
+                raise
+
+            except HTTPException as e:
+                await uow.rollback()
+                logger.info(f"Unexpected error: {e}")
+                raise AppException(e.detail, e.status_code)

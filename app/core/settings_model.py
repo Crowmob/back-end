@@ -11,7 +11,15 @@ class PostgresConfig(BaseConfig):
     USER: str = Field(..., alias="POSTGRES_USER")
     PASSWORD: str = Field(..., alias="POSTGRES_PASSWORD")
     DB: str = Field(..., alias="POSTGRES_DB")
+    TEST_DB: str = Field(..., alias="TEST_POSTGRES_DB")
     URL: str = Field(..., alias="POSTGRES_URL")
+    TEST_URL: str = Field(..., alias="TEST_POSTGRES_URL")
+
+    def get_url(self, env: str) -> str:
+        return self.TEST_URL if env == "test" else self.URL
+
+    def get_db(self, env: str) -> str:
+        return self.TEST_DB if env == "test" else self.DB
 
 
 class RedisConfig(BaseConfig):
@@ -20,9 +28,11 @@ class RedisConfig(BaseConfig):
 
 
 class Settings(BaseConfig):
+    ENV: str
     HOST: str
     PORT: int
     RELOAD: bool
+    REACT_URL: str
 
     db: PostgresConfig = PostgresConfig()
     redis: RedisConfig = RedisConfig()

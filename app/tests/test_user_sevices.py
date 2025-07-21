@@ -1,75 +1,68 @@
-import pytest, pytest_asyncio
+import pytest
 
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from fastapi import HTTPException
+from sqlalchemy import insert, select
 
 from app.schemas.user import UserSchema, UserUpdateRequestModel, GetAllUsersRequestModel
-from app.services.user import UserServices
-from app.db.unit_of_work import UnitOfWork
-from app.core.settings_model import settings
-
-
-@pytest_asyncio.fixture
-async def session():
-    engine = create_async_engine(settings.db.URL, echo=False)
-    test_session_maker = async_sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-    async with test_session_maker() as session:
-        yield session
-        await session.rollback()
-
-
-@pytest.fixture
-def user_services(session, monkeypatch):
-    def unit_of_work_with_session():
-        return UnitOfWork(session=session)
-
-    monkeypatch.setattr("app.services.user.UnitOfWork", unit_of_work_with_session)
-    return UserServices()
+from app.models.user_model import User
 
 
 @pytest.mark.asyncio
-async def test_create_user(user_services):
+async def test_create_user(db_session, user_services):
     user_data = UserSchema(
-        username="testname1",
-        email="test@mail.com",
+        username="test",
+        email="test@example.com",
         password="1234",
     )
-    global user_id
+
     user_id = await user_services.create_user(
         user_data.username, user_data.email, user_data.password
     )
-    assert type(user_id) == int
+    assert isinstance(user_id, int)
+
+    db_user = await db_session.scalar(select(User).where(User.id == user_id))
+    assert db_user.username == user_data.username
+    assert db_user.email == user_data.email
 
 
 @pytest.mark.asyncio
-async def test_get_all_users(user_services):
-    data = GetAllUsersRequestModel(limit=1)
-    users_list = await user_services.get_all_users(data.limit, data.offset)
-    assert len(users_list.items) == 1
-
-
-@pytest.mark.asyncio
-async def test_get_user_by_id(user_services):
-    user = await user_services.get_user_by_id(user_id)
-    assert user.username == "testname1"
-
-
-@pytest.mark.asyncio
-async def test_update_user(user_services):
-    update_data = UserUpdateRequestModel(username="testname2")
-    await user_services.update_user(
-        user_id, update_data.username, update_data.email, update_data.password
+async def test_get_all_users(db_session, user_services):
+    await db_session.execute(
+        insert(User).values(
+            username="test1", email="test1@example.com", password="1234"
+        )
     )
-    user = await user_services.get_user_by_id(user_id)
-    assert user.username == "testname2"
+    await db_session.execute(
+        insert(User).values(
+            username="test2", email="test2@example.com", password="1234"
+        )
+    )
+    await db_session.commit()
+
+    data = GetAllUsersRequestModel(limit=2)
+    users_list = await user_services.get_all_users(data.limit, data.offset)
+    assert len(users_list.items) == 2
 
 
 @pytest.mark.asyncio
-async def test_delete_user(user_services):
-    await user_services.delete_user(user_id)
-    with pytest.raises(HTTPException) as exc_info:
-        await user_services.get_user_by_id(user_id)
+async def test_get_user_by_id(user_services, test_user):
+    user = await user_services.get_user_by_id(test_user)
 
-    assert exc_info.value.status_code == 404
+    assert user.username == "test"
+    assert user.email == "test@example.com"
+
+
+@pytest.mark.asyncio
+async def test_update_user(db_session, user_services, test_user):
+    data = UserUpdateRequestModel(username="updated")
+    await user_services.update_user(test_user, data.username, data.email, data.password)
+
+    updated_user = await db_session.scalar(select(User).where(User.id == test_user))
+    assert updated_user.username == "updated"
+
+
+@pytest.mark.asyncio
+async def test_delete_user(db_session, user_services, test_user):
+    await user_services.delete_user(test_user)
+
+    user = await db_session.scalar(select(User).where(User.id == test_user))
+    assert user is None
