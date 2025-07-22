@@ -1,4 +1,3 @@
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.postgres_init import async_session_maker
@@ -6,7 +5,7 @@ from app.db.repositories.user_repository import UserRepository
 
 
 class UnitOfWork:
-    def __init__(self, session: Optional[AsyncSession] = None):
+    def __init__(self, session: AsyncSession | None = None):
         self._external_session = session
         self.session = None
         self.users = None

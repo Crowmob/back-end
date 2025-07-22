@@ -99,3 +99,6 @@ class UserServices:
             except SQLAlchemyError as e:
                 logger.info(f"SQLAlchemy error: {e}")
                 raise
+
+
+user_services = UserServices()

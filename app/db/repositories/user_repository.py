@@ -1,7 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, func
-from typing import Optional
 
 from app.models.user_model import User
 from app.schemas.user import UserDetailResponse, ListResponse
@@ -12,7 +11,7 @@ class UserRepository:
         self.session = session
 
     async def get_all_users(
-        self, limit: Optional[int] = None, offset: Optional[int] = None
+        self, limit: int | None = None, offset: int | None = None
     ) -> ListResponse[UserDetailResponse]:
         count_stmt = select(func.count()).select_from(User).scalar_subquery()
         stmt = select(User, count_stmt.label("total_count"))
@@ -43,6 +42,7 @@ class UserRepository:
         new_user = User(username=username, email=email, password=password)
         self.session.add(new_user)
         await self.session.flush()
+        await self.session.refresh(new_user)
         return new_user.id
 
     async def update_user(self, user_id: int, values_to_update) -> None:
