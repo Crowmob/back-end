@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.db.unit_of_work import UnitOfWork
@@ -34,7 +33,7 @@ class UserServices:
                 raise
 
     @staticmethod
-    async def get_all_users(limit: Optional[int] = None, offset: Optional[int] = None):
+    async def get_all_users(limit: int | None = None, offset: int | None = None):
         async with UnitOfWork() as uow:
             try:
                 users = await uow.users.get_all_users(limit, offset)
@@ -46,23 +45,26 @@ class UserServices:
                 raise
 
     @staticmethod
-    async def get_user_by_id(user_id: int, existing_uow: Optional[UnitOfWork] = None):
-        async with existing_uow if existing_uow else UnitOfWork() as uow:
-            try:
-                user = await uow.users.get_user_by_id(user_id)
-                if not user:
-                    logger.warning(f"No user found with id={user_id}")
-                    raise UserNotFoundException(user_id)
-                logger.info(f"Fetched user with id={user_id}")
-                return user
+    async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
+        try:
+            user = await uow.users.get_user_by_id(user_id)
+            if not user:
+                logger.warning(f"No user found with id={user_id}")
+                raise UserNotFoundException(user_id)
+            logger.info(f"Fetched user with id={user_id}")
+            return user
 
-            except SQLAlchemyError as e:
-                logger.info(f"SQLAlchemy error: {e}")
-                raise
+        except SQLAlchemyError as e:
+            logger.info(f"SQLAlchemy error: {e}")
+            raise
+
+    async def get_user_by_id(self, user_id: int):
+        async with UnitOfWork() as uow:
+            return await self.get_user_by_id_with_uow(user_id, uow)
 
     async def update_user(self, user_id: int, username: str, email: str, password: str):
         async with UnitOfWork() as uow:
-            await self.get_user_by_id(user_id, uow)
+            await self.get_user_by_id_with_uow(user_id, uow)
             if password:
                 password = hash_password(password)
             values_to_update = {
@@ -89,7 +91,7 @@ class UserServices:
 
     async def delete_user(self, user_id: int):
         async with UnitOfWork() as uow:
-            await self.get_user_by_id(user_id, uow)
+            await self.get_user_by_id_with_uow(user_id, uow)
             try:
                 await uow.users.delete_user(user_id)
                 logger.info(f"User deleted: id={user_id}")
@@ -97,12 +99,3 @@ class UserServices:
             except SQLAlchemyError as e:
                 logger.info(f"SQLAlchemy error: {e}")
                 raise
-
-
-user_services = UserServices()
-
-create_user = user_services.create_user
-get_all_users = user_services.get_all_users
-get_user_by_id = user_services.get_user_by_id
-update_user = user_services.update_user
-delete_user = user_services.delete_user
