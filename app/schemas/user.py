@@ -20,7 +20,7 @@ class SignUpRequestModel(BaseModel):
 
 
 class SignInRequestModel(BaseModel):
-    username: str
+    email: str
     password: str
 
 
@@ -45,6 +45,7 @@ class UserDetailResponse(BaseModel):
     id: int
     username: str
     email: str
+    password: str
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)

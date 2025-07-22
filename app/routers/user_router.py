@@ -4,6 +4,7 @@ from app.services import (
     create_user,
     get_all_users,
     get_user_by_id,
+    get_user_by_email,
     update_user,
     delete_user,
 )
@@ -22,6 +23,11 @@ user_router = APIRouter(tags=["User CRUD"])
 @user_router.get("/get_user_by_id", response_model=UserDetailResponse)
 async def get_user_by_id_endpoint(user_id: int):
     return await get_user_by_id(user_id)
+
+
+@user_router.get("/get_user_by_email", response_model=UserDetailResponse)
+async def get_user_by_email_endpoint(email: str):
+    return await get_user_by_email(email)
 
 
 @user_router.get("/get_all_users", response_model=ListResponse[UserDetailResponse])

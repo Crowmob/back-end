@@ -39,6 +39,13 @@ class UserRepository:
             return UserDetailResponse.model_validate(user)
         return None
 
+    async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
+        result = await self.session.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        if user:
+            return UserDetailResponse.model_validate(user)
+        return None
+
     async def create_user(self, username: str, email: str, password: str) -> int:
         new_user = User(username=username, email=email, password=password)
         self.session.add(new_user)

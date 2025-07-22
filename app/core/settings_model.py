@@ -18,9 +18,6 @@ class PostgresConfig(BaseConfig):
     def get_url(self, env: str) -> str:
         return self.TEST_URL if env == "test" else self.URL
 
-    def get_db(self, env: str) -> str:
-        return self.TEST_DB if env == "test" else self.DB
-
 
 class RedisConfig(BaseConfig):
     PORT: str = Field(..., alias="REDIS_PORT")
@@ -33,6 +30,11 @@ class Settings(BaseConfig):
     PORT: int
     RELOAD: bool
     REACT_URL: str
+    SECRET_KEY: str
+    ALGORITHM: str
+    AUTH0_DOMAIN: str
+    API_AUDIENCE: str
+    EXP_TIME: int
 
     db: PostgresConfig = PostgresConfig()
     redis: RedisConfig = RedisConfig()
