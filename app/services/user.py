@@ -1,8 +1,6 @@
 import logging
 from typing import Optional
-from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from fastapi import HTTPException
 
 from app.db.unit_of_work import UnitOfWork
 from app.utils.password import hash_password
@@ -23,25 +21,17 @@ class UserServices:
             password = hash_password(password)
             try:
                 user_id = await uow.users.create_user(username, email, password)
-                await uow.commit()
                 logger.info(f"User created: {username}")
                 return user_id
             except IntegrityError:
-                await uow.rollback()
                 logger.error(
                     f"Error creating user: User with email {email} already exists"
                 )
                 raise UserAlreadyExistsException(email)
 
             except SQLAlchemyError as e:
-                await uow.rollback()
                 logger.info(f"SQLAlchemy error: {e}")
                 raise
-
-            except HTTPException as e:
-                await uow.rollback()
-                logger.info(f"Unexpected error: {e}")
-                raise AppException(e.detail, e.status_code)
 
     @staticmethod
     async def get_all_users(limit: Optional[int] = None, offset: Optional[int] = None):
@@ -55,15 +45,9 @@ class UserServices:
                 logger.info(f"SQLAlchemy error: {e}")
                 raise
 
-            except HTTPException as e:
-                logger.info(f"Unexpected error: {e}")
-                raise AppException(e.detail, e.status_code)
-
     @staticmethod
     async def get_user_by_id(user_id: int, existing_uow: Optional[UnitOfWork] = None):
-        async with UnitOfWork() as uow:
-            if existing_uow:
-                uow = existing_uow
+        async with existing_uow if existing_uow else UnitOfWork() as uow:
             try:
                 user = await uow.users.get_user_by_id(user_id)
                 if not user:
@@ -75,10 +59,6 @@ class UserServices:
             except SQLAlchemyError as e:
                 logger.info(f"SQLAlchemy error: {e}")
                 raise
-
-            except HTTPException as e:
-                logger.info(f"Unexpected error: {e}")
-                raise AppException(e.detail, e.status_code)
 
     async def update_user(self, user_id: int, username: str, email: str, password: str):
         async with UnitOfWork() as uow:
@@ -95,12 +75,10 @@ class UserServices:
                     values_to_update.pop(key)
             try:
                 await uow.users.update_user(user_id, values_to_update)
-                await uow.commit()
 
                 logger.info(f"User updated: id={user_id}")
 
             except IntegrityError as e:
-                await uow.rollback()
                 logger.info(f"Integrity error: {e}")
                 raise UserUpdateException(user_id)
 
@@ -109,25 +87,22 @@ class UserServices:
                 logger.info(f"SQLAlchemy error: {e}")
                 raise AppException(detail="Database exception occurred.")
 
-            except HTTPException as e:
-                await uow.rollback()
-                logger.info(f"Unexpected error: {e}")
-                raise AppException(e.detail, e.status_code)
-
     async def delete_user(self, user_id: int):
         async with UnitOfWork() as uow:
             await self.get_user_by_id(user_id, uow)
             try:
                 await uow.users.delete_user(user_id)
-                await uow.commit()
                 logger.info(f"User deleted: id={user_id}")
 
             except SQLAlchemyError as e:
-                await uow.rollback()
                 logger.info(f"SQLAlchemy error: {e}")
                 raise
 
-            except HTTPException as e:
-                await uow.rollback()
-                logger.info(f"Unexpected error: {e}")
-                raise AppException(e.detail, e.status_code)
+
+user_services = UserServices()
+
+create_user = user_services.create_user
+get_all_users = user_services.get_all_users
+get_user_by_id = user_services.get_user_by_id
+update_user = user_services.update_user
+delete_user = user_services.delete_user

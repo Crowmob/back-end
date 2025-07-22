@@ -14,7 +14,8 @@ class UserRepository:
     async def get_all_users(
         self, limit: Optional[int] = None, offset: Optional[int] = None
     ) -> ListResponse[UserDetailResponse]:
-        stmt = select(User)
+        count_stmt = select(func.count()).select_from(User).scalar_subquery()
+        stmt = select(User, count_stmt.label("total_count"))
 
         if offset is not None:
             stmt = stmt.offset(offset)
@@ -22,10 +23,9 @@ class UserRepository:
             stmt = stmt.limit(limit)
 
         result = await self.session.execute(stmt)
-        users = result.scalars().all()
-
-        count_stmt = select(func.count()).select_from(User)
-        total_count = await self.session.scalar(count_stmt)
+        rows = result.all()
+        total_count = rows[0].total_count
+        users = [row.User for row in rows]
 
         return ListResponse[UserDetailResponse](
             items=[UserDetailResponse.model_validate(user) for user in users],
