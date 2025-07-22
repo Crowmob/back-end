@@ -46,8 +46,21 @@ class UserRepository:
             return UserDetailResponse.model_validate(user)
         return None
 
-    async def create_user(self, username: str, email: str, password: str) -> int:
-        new_user = User(username=username, email=email, password=password)
+    async def create_user(
+        self,
+        username: str | None,
+        email: str,
+        password: str | None,
+        auth_provider: str | None,
+        oauth_id: str | None,
+    ) -> int:
+        new_user = User(
+            username=username,
+            email=email,
+            password=password,
+            auth_provider=auth_provider,
+            oauth_id=oauth_id,
+        )
         self.session.add(new_user)
         await self.session.flush()
         return new_user.id

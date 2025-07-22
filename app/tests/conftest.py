@@ -36,8 +36,8 @@ async def test_user(db_session):
     result = await db_session.execute(
         insert(User)
         .values(username="test", email="test@example.com", password="1234")
-        .returning(User.id)
+        .returning(User.id, User.email)
     )
-    user_id = result.scalar_one()
+    user_id, email = result.one()
     await db_session.commit()
-    return user_id
+    return {"id": user_id, "email": email}

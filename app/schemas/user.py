@@ -1,15 +1,19 @@
+from typing import Generic, TypeVar
+
 from pydantic import BaseModel, ConfigDict
 from pydantic.generics import GenericModel
-from datetime import datetime
-from typing import Optional, List, Generic, TypeVar
+
+from app.schemas.base import IDMixin, TimestampMixin
 
 T = TypeVar("T")
 
 
 class UserSchema(BaseModel):
-    username: str
+    username: str | None = None
     email: str
-    password: str
+    password: str | None = None
+    auth_provider: str | None = None
+    oauth_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -25,27 +29,28 @@ class SignInRequestModel(BaseModel):
 
 
 class UserUpdateRequestModel(BaseModel):
-    username: Optional[str] = None
-    email: Optional[str] = None
-    password: Optional[str] = None
+    username: str | None = None
+    email: str | None = None
+    password: str | None = None
+    auth_provider: str | None = None
+    oauth_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
 class GetAllUsersRequestModel(BaseModel):
-    limit: Optional[int] = None
-    offset: Optional[int] = None
+    limit: int | None = None
+    offset: int | None = None
 
 
 class ListResponse(GenericModel, Generic[T]):
-    items: List[T]
+    items: list[T]
     count: int
 
 
-class UserDetailResponse(BaseModel):
-    id: int
-    username: str
+class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
+    username: str | None = None
     email: str
-    password: str
-    created_at: datetime
-    updated_at: datetime
+    password: str | None = None
+    auth_provider: str | None = None
+    oauth_id: str | None = None
     model_config = ConfigDict(from_attributes=True)

@@ -8,14 +8,10 @@ from app.models.user_model import User
 
 @pytest.mark.asyncio
 async def test_create_user(db_session, user_services):
-    user_data = UserSchema(
-        username="test",
-        email="test@example.com",
-        password="1234",
-    )
+    user_data = UserSchema(username="test", email="test@example.com", password="1234")
 
     user_id = await user_services.create_user(
-        user_data.username, user_data.email, user_data.password
+        user_data.username, user_data.email, user_data.password, None, None
     )
     assert isinstance(user_id, int)
 
@@ -45,7 +41,15 @@ async def test_get_all_users(db_session, user_services):
 
 @pytest.mark.asyncio
 async def test_get_user_by_id(user_services, test_user):
-    user = await user_services.get_user_by_id(test_user)
+    user = await user_services.get_user_by_id(test_user["id"])
+
+    assert user.username == "test"
+    assert user.email == "test@example.com"
+
+
+@pytest.mark.asyncio
+async def test_get_user_by_email(user_services, test_user):
+    user = await user_services.get_user_by_email(test_user["email"])
 
     assert user.username == "test"
     assert user.email == "test@example.com"
@@ -54,15 +58,19 @@ async def test_get_user_by_id(user_services, test_user):
 @pytest.mark.asyncio
 async def test_update_user(db_session, user_services, test_user):
     data = UserUpdateRequestModel(username="updated")
-    await user_services.update_user(test_user, data.username, data.email, data.password)
+    await user_services.update_user(
+        test_user["id"], data.username, data.email, data.password
+    )
 
-    updated_user = await db_session.scalar(select(User).where(User.id == test_user))
+    updated_user = await db_session.scalar(
+        select(User).where(User.id == test_user["id"])
+    )
     assert updated_user.username == "updated"
 
 
 @pytest.mark.asyncio
 async def test_delete_user(db_session, user_services, test_user):
-    await user_services.delete_user(test_user)
+    await user_services.delete_user(test_user["id"])
 
-    user = await db_session.scalar(select(User).where(User.id == test_user))
+    user = await db_session.scalar(select(User).where(User.id == test_user["id"]))
     assert user is None

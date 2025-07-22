@@ -57,9 +57,6 @@ def verify_jwt(token: str):
     except jwt.JWTClaimsError:
         logger.error("Incorrect claims")
         raise UnauthorizedException(detail="Incorrect claims.")
-    except HTTPException:
-        logger.exception("Token invalid")
-        raise UnauthorizedException(detail="Token invalid.")
 
 
 def get_data_from_token(
