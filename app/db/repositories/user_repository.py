@@ -23,6 +23,9 @@ class UserRepository:
 
         result = await self.session.execute(stmt)
         rows = result.all()
+        if not rows:
+            return ListResponse[UserDetailResponse](items=[], count=0)
+
         total_count = rows[0].total_count
         users = [row.User for row in rows]
 
