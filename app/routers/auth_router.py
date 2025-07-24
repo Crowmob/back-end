@@ -3,12 +3,12 @@ from fastapi import APIRouter, Depends
 from app.auth import get_data_from_token
 from app.services.user import UserServices
 
-auth_router = APIRouter(tags=["Auth0 Authentication"])
+auth_router = APIRouter(tags=["Auth0 Authentication"], prefix="/auth")
 user_services = UserServices()
 
 
-@auth_router.get("/private")
-async def private(data: dict = Depends(get_data_from_token)):
+@auth_router.get("/{token}")
+async def auth_user(data: dict = Depends(get_data_from_token)):
     email = data["http://localhost:8000/email"]
     sub = data["sub"].split("|")
     auth_provider = sub[0]

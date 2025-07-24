@@ -2,7 +2,7 @@ import requests
 import logging
 
 from jose import jwt
-from fastapi import HTTPException, Security
+from fastapi import Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.exceptions.auth_exceptions import UnauthorizedException

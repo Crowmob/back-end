@@ -1,7 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, func
-from typing import Optional
 
 from app.models.user_model import User
 from app.schemas.user import UserDetailResponse, ListResponse
@@ -12,9 +11,10 @@ class UserRepository:
         self.session = session
 
     async def get_all_users(
-        self, limit: Optional[int] = None, offset: Optional[int] = None
+        self, limit: int | None = None, offset: int | None = None
     ) -> ListResponse[UserDetailResponse]:
-        stmt = select(User)
+        count_stmt = select(func.count()).select_from(User).scalar_subquery()
+        stmt = select(User, count_stmt.label("total_count"))
 
         if offset is not None:
             stmt = stmt.offset(offset)
@@ -22,10 +22,12 @@ class UserRepository:
             stmt = stmt.limit(limit)
 
         result = await self.session.execute(stmt)
-        users = result.scalars().all()
+        rows = result.all()
+        if not rows:
+            return ListResponse[UserDetailResponse](items=[], count=0)
 
-        count_stmt = select(func.count()).select_from(User)
-        total_count = await self.session.scalar(count_stmt)
+        total_count = rows[0].total_count
+        users = [row.User for row in rows]
 
         return ListResponse[UserDetailResponse](
             items=[UserDetailResponse.model_validate(user) for user in users],

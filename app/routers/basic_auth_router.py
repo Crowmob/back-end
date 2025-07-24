@@ -6,7 +6,7 @@ from app.services.user import UserServices
 from app.utils.token import create_access_token, decode_token
 from app.utils.password import check_password
 
-basic_auth_router = APIRouter(tags=["Basic Authentication"])
+basic_auth_router = APIRouter(tags=["Basic Authentication"], prefix="user")
 user_services = UserServices()
 
 
