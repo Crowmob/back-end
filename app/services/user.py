@@ -2,7 +2,7 @@ import logging
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.db.unit_of_work import UnitOfWork
-from app.utils.password import hash_password
+from app.services.password import password_services
 from app.core.exceptions.user_exceptions import (
     AppException,
     UserWithIdNotFoundException,
@@ -25,7 +25,7 @@ class UserServices:
     ):
         async with UnitOfWork() as uow:
             if password:
-                password = hash_password(password)
+                password = password_services.hash_password(password)
             try:
                 user_id = await uow.users.create_user(
                     username, email, password, auth_provider, oauth_id
@@ -87,14 +87,13 @@ class UserServices:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise
 
-    async def update_user(self, user_id: int, username: str, email: str, password: str):
+    async def update_user(self, user_id: int, username: str, password: str):
         async with UnitOfWork() as uow:
             await self.get_user_by_id_with_uow(user_id, uow)
             if password:
-                password = hash_password(password)
+                password = password_services.hash_password(password)
             values_to_update = {
                 "username": username,
-                "email": email,
                 "password": password,
             }
             for key in list(values_to_update.keys()):

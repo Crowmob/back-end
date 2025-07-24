@@ -32,6 +32,7 @@ class Settings(BaseConfig):
     REACT_URL: str
     SECRET_KEY: str
     ALGORITHM: str
+    AUTH0_ALGORITHM: str
     AUTH0_DOMAIN: str
     API_AUDIENCE: str
     EXP_TIME: int

@@ -30,10 +30,7 @@ class SignInRequestModel(BaseModel):
 
 class UserUpdateRequestModel(BaseModel):
     username: str | None = None
-    email: str | None = None
     password: str | None = None
-    auth_provider: str | None = None
-    oauth_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

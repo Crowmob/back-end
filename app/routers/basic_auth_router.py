@@ -2,19 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.schemas.response_models import MeResponseModel, AuthResponseModel
 from app.schemas.user import SignUpRequestModel, SignInRequestModel
-from app.services.user import user_services
-from app.utils.token import create_access_token, decode_token
-from app.utils.password import check_password
+from app.services.auth_services.basic import basic_auth_services
 
-basic_auth_router = APIRouter(tags=["Basic Authentication"], prefix="user")
+basic_auth_router = APIRouter(tags=["Basic Authentication"], prefix="/user")
 
 
 @basic_auth_router.post("/register", response_model=AuthResponseModel)
 async def register(data: SignUpRequestModel = Depends()):
-    user_id = await user_services.create_user(
-        data.username, data.email, data.password, None, None
-    )
-    token = create_access_token(user_id)
+    token = await basic_auth_services.register(data.username, data.email, data.password)
     return AuthResponseModel(
         status_code=200, message="Registered successfully!", token=token
     )
@@ -22,9 +17,8 @@ async def register(data: SignUpRequestModel = Depends()):
 
 @basic_auth_router.post("/login", response_model=AuthResponseModel)
 async def login(data: SignInRequestModel = Depends()):
-    user = await user_services.get_user_by_email(data.email)
-    if check_password(data.password, user.password):
-        token = create_access_token(user.id)
+    token = await basic_auth_services.login(data.email, data.password)
+    if token:
         return AuthResponseModel(status_code=200, message="Logged in", token=token)
     else:
         raise HTTPException(
@@ -34,6 +28,5 @@ async def login(data: SignInRequestModel = Depends()):
 
 @basic_auth_router.get("/me", response_model=MeResponseModel)
 async def get_me(token: str):
-    data = decode_token(token)
-    user = await user_services.get_user_by_id(data["id"])
+    user = await basic_auth_services.get_me(token)
     return MeResponseModel(status_code=200, me=user)

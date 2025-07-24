@@ -58,9 +58,7 @@ async def test_get_user_by_email(user_services, test_user):
 @pytest.mark.asyncio
 async def test_update_user(db_session, user_services, test_user):
     data = UserUpdateRequestModel(username="updated")
-    await user_services.update_user(
-        test_user["id"], data.username, data.email, data.password
-    )
+    await user_services.update_user(test_user["id"], data.username, data.password)
 
     updated_user = await db_session.scalar(
         select(User).where(User.id == test_user["id"])

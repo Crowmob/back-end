@@ -1,0 +1,92 @@
+import requests
+import logging
+
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from fastapi import Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+from app.core.exceptions.auth_exceptions import UnauthorizedException
+from app.core.settings_model import settings
+
+AUTH0_DOMAIN = settings.AUTH0_DOMAIN
+API_AUDIENCE = settings.API_AUDIENCE
+ALGORITHM = settings.ALGORITHM
+AUTH0_ALGORITHM = settings.ALGORITHM
+
+auth_scheme = HTTPBearer()
+
+jwks = requests.get(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json").json()
+
+logger = logging.getLogger(__name__)
+
+
+class TokenServices:
+    @staticmethod
+    def decode_auth0_token(token: str):
+        try:
+            header = jwt.get_unverified_header(token)
+        except Exception:
+            logger.exception("Invalid header")
+            raise UnauthorizedException(detail="Invalid header")
+
+        rsa_key = {}
+        for key in jwks["keys"]:
+            if key["kid"] == header["kid"]:
+                rsa_key = {
+                    "kty": key["kty"],
+                    "kid": key["kid"],
+                    "use": key["use"],
+                    "n": key["n"],
+                    "e": key["e"],
+                }
+                break
+
+        if not rsa_key:
+            logger.exception("Public key not found")
+            raise UnauthorizedException(detail="Public key not found.")
+
+        try:
+            payload = jwt.decode(
+                token,
+                rsa_key,
+                algorithms=[AUTH0_ALGORITHM],
+                audience=API_AUDIENCE,
+                issuer=f"https://{AUTH0_DOMAIN}/",
+            )
+            return payload
+        except jwt.ExpiredSignatureError:
+            logger.error("Token expired")
+            raise UnauthorizedException(detail="Token expired.")
+        except jwt.JWTClaimsError:
+            logger.error("Incorrect claims")
+            raise UnauthorizedException(detail="Incorrect claims.")
+
+    def get_data_from_token(
+        self,
+        credentials: HTTPAuthorizationCredentials = Security(auth_scheme),
+    ):
+        return self.decode_auth0_token(credentials.credentials)
+
+    @staticmethod
+    def create_access_token(id: int):
+        data = {"id": id}
+        to_encode = data.copy()
+        expire = datetime.utcnow() + timedelta(minutes=settings.EXP_TIME)
+        to_encode.update({"exp": int(expire.timestamp())})
+        logger.info("Created access token")
+        return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    @staticmethod
+    def decode_token(token: str):
+        try:
+            data = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            )
+            return data
+        except JWTError:
+            logger.error("Invalid token")
+            raise UnauthorizedException(detail="Invalid token")
+
+
+token_services = TokenServices()

@@ -42,9 +42,7 @@ async def create_user_endpoint(user_data: SignUpRequestModel):
 async def update_user_endpoint(
     user_id: int, update_data: UserUpdateRequestModel = Depends()
 ):
-    await user_services.update_user(
-        user_id, update_data.username, update_data.email, update_data.password
-    )
+    await user_services.update_user(user_id, update_data.username, update_data.password)
     return ResponseModel(
         status_code=200, message=f"Successfully updated user with id: {user_id}!"
     )
