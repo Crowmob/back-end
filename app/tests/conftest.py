@@ -3,7 +3,7 @@ import pytest_asyncio
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import insert
-from app.services.user import UserServices
+from app.services.user import user_services
 from app.db.unit_of_work import UnitOfWork
 from app.core.settings_model import settings
 from app.models.user_model import User
@@ -23,12 +23,12 @@ async def db_session():
 
 
 @pytest.fixture
-def user_services(db_session, monkeypatch):
+def user_services_fixture(db_session, monkeypatch):
     def unit_of_work_with_session():
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.user.UnitOfWork", unit_of_work_with_session)
-    return UserServices()
+    return user_services
 
 
 @pytest_asyncio.fixture

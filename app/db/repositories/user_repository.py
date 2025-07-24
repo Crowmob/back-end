@@ -65,6 +65,7 @@ class UserRepository:
         )
         self.session.add(new_user)
         await self.session.flush()
+        await self.session.refresh(new_user)
         return new_user.id
 
     async def update_user(self, user_id: int, values_to_update) -> None:
