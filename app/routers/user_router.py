@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.services.user import UserServices
+from app.services.user import user_services
 from app.schemas.user import (
     GetAllUsersRequestModel,
     SignUpRequestModel,
@@ -11,7 +11,6 @@ from app.schemas.user import (
 from app.schemas.response_models import ResponseModel
 
 user_router = APIRouter(tags=["User CRUD"], prefix="/users")
-user_services = UserServices()
 
 
 @user_router.get("/{user_id}", response_model=UserDetailResponse)

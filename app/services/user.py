@@ -30,18 +30,15 @@ class UserServices:
                 user_id = await uow.users.create_user(
                     username, email, password, auth_provider, oauth_id
                 )
-                await uow.commit()
                 logger.info(f"User created: {username}")
                 return user_id
             except IntegrityError:
-                await uow.rollback()
                 logger.error(
                     f"Error creating user: User with email {email} already exists"
                 )
                 raise UserAlreadyExistsException(email)
 
             except SQLAlchemyError as e:
-                await uow.rollback()
                 logger.error(f"SQLAlchemy error: {e}")
                 raise
 
@@ -105,17 +102,14 @@ class UserServices:
                     values_to_update.pop(key)
             try:
                 await uow.users.update_user(user_id, values_to_update)
-                await uow.commit()
 
                 logger.info(f"User updated: id={user_id}")
 
             except IntegrityError as e:
-                await uow.rollback()
                 logger.error(f"Integrity error: {e}")
                 raise UserUpdateException(user_id)
 
             except SQLAlchemyError as e:
-                await uow.rollback()
                 logger.error(f"SQLAlchemy error: {e}")
                 raise AppException(detail="Database exception occurred.")
 
@@ -124,10 +118,11 @@ class UserServices:
             await self.get_user_by_id_with_uow(user_id, uow)
             try:
                 await uow.users.delete_user(user_id)
-                await uow.commit()
                 logger.info(f"User deleted: id={user_id}")
 
             except SQLAlchemyError as e:
-                await uow.rollback()
                 logger.error(f"SQLAlchemy error: {e}")
                 raise
+
+
+user_services = UserServices()

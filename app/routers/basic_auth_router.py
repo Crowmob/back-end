@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.schemas.response_models import MeResponseModel, AuthResponseModel
 from app.schemas.user import SignUpRequestModel, SignInRequestModel
-from app.services.user import UserServices
+from app.services.user import user_services
 from app.utils.token import create_access_token, decode_token
 from app.utils.password import check_password
 
 basic_auth_router = APIRouter(tags=["Basic Authentication"], prefix="user")
-user_services = UserServices()
 
 
 @basic_auth_router.post("/register", response_model=AuthResponseModel)

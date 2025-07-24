@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends
 
 from app.auth import get_data_from_token
-from app.services.user import UserServices
+from app.services.user import user_services
 
 auth_router = APIRouter(tags=["Auth0 Authentication"], prefix="/auth")
-user_services = UserServices()
 
 
 @auth_router.get("/{token}")
