@@ -13,16 +13,14 @@ logger = logging.getLogger(__name__)
 
 @auth_router.post("/", response_model=ResponseModel)
 async def auth_user(body: Username = Body(...), authorization: str = Header(...)):
-    logger.info(body)
-    name = body.name
     token = authorization.removeprefix("Bearer ")
     data = token_services.get_data_from_token(token)
     email = await auth0_user_services.auth_user(
-        name, data["http://localhost:8000/email"], data["sub"]
+        body.name, data["http://localhost:8000/email"], data["sub"]
     )
     return ResponseModel(
         status_code=200,
-        message=f"Successfully authenticated user {name} with email: {email}",
+        message=f"Successfully authenticated user with email: {email}",
     )
 
 
