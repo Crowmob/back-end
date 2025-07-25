@@ -17,6 +17,10 @@ class UserSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class Username(BaseModel):
+    name: str | None = None
+
+
 class SignUpRequestModel(BaseModel):
     username: str
     email: str

@@ -35,6 +35,8 @@ class Settings(BaseConfig):
     AUTH0_ALGORITHM: str
     AUTH0_DOMAIN: str
     API_AUDIENCE: str
+    CLIENT_ID: str
+    CLIENT_SECRET: str
     EXP_TIME: int
 
     db: PostgresConfig = PostgresConfig()

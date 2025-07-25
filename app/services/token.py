@@ -3,8 +3,8 @@ import logging
 
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from fastapi import Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwk as jose_jwk
+from fastapi.security import HTTPBearer
 
 from app.core.exceptions.auth_exceptions import UnauthorizedException
 from app.core.settings_model import settings
@@ -12,7 +12,7 @@ from app.core.settings_model import settings
 AUTH0_DOMAIN = settings.AUTH0_DOMAIN
 API_AUDIENCE = settings.API_AUDIENCE
 ALGORITHM = settings.ALGORITHM
-AUTH0_ALGORITHM = settings.ALGORITHM
+AUTH0_ALGORITHM = settings.AUTH0_ALGORITHM
 
 auth_scheme = HTTPBearer()
 
@@ -30,16 +30,10 @@ class TokenServices:
             logger.exception("Invalid header")
             raise UnauthorizedException(detail="Invalid header")
 
-        rsa_key = {}
+        rsa_key = None
         for key in jwks["keys"]:
             if key["kid"] == header["kid"]:
-                rsa_key = {
-                    "kty": key["kty"],
-                    "kid": key["kid"],
-                    "use": key["use"],
-                    "n": key["n"],
-                    "e": key["e"],
-                }
+                rsa_key = jose_jwk.construct(key)
                 break
 
         if not rsa_key:
@@ -49,12 +43,13 @@ class TokenServices:
         try:
             payload = jwt.decode(
                 token,
-                rsa_key,
+                key=rsa_key.to_pem().decode("utf-8"),
                 algorithms=[AUTH0_ALGORITHM],
                 audience=API_AUDIENCE,
                 issuer=f"https://{AUTH0_DOMAIN}/",
             )
             return payload
+
         except jwt.ExpiredSignatureError:
             logger.error("Token expired")
             raise UnauthorizedException(detail="Token expired.")
@@ -62,11 +57,10 @@ class TokenServices:
             logger.error("Incorrect claims")
             raise UnauthorizedException(detail="Incorrect claims.")
 
-    def get_data_from_token(
-        self,
-        credentials: HTTPAuthorizationCredentials = Security(auth_scheme),
-    ):
-        return self.decode_auth0_token(credentials.credentials)
+    def get_data_from_token(self, token: str):
+        data = self.decode_auth0_token(token)
+        logger.info(data)
+        return data
 
     @staticmethod
     def create_access_token(id: int):
