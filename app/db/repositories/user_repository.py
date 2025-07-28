@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete, func
 
-from app.models.user_model import User
+from app.models.user_model import User, Identities
 from app.schemas.user import UserDetailResponse, ListResponse
 
 
@@ -53,20 +53,29 @@ class UserRepository:
         username: str | None,
         email: str,
         password: str | None,
-        auth_provider: str | None,
-        oauth_id: str | None,
     ) -> int:
         new_user = User(
             username=username,
             email=email,
             password=password,
-            auth_provider=auth_provider,
-            oauth_id=oauth_id,
         )
         self.session.add(new_user)
         await self.session.flush()
         await self.session.refresh(new_user)
         return new_user.id
+
+    async def create_identity(
+        self,
+        user_id: int,
+        provider: str,
+        provider_id: str,
+    ) -> None:
+        new_identity = Identities(
+            user_id=user_id,
+            provider=provider,
+            provider_id=provider_id,
+        )
+        self.session.add(new_identity)
 
     async def update_user(self, user_id: int, values_to_update) -> None:
         await self.session.execute(

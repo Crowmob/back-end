@@ -1,9 +1,9 @@
 import httpx
 import logging
-from fastapi import HTTPException
 
 from app.services.user import user_services
-from app.core.settings_model import settings
+from app.utils.settings_model import settings
+from app.utils.token import token_services
 
 logger = logging.getLogger(__name__)
 
@@ -14,21 +14,18 @@ class Auth0UserServices:
         sub = sub.split("|")
         auth_provider = sub[0]
         oauth_id = sub[1]
-        user_id = await user_services.create_user(
-            name, email, None, auth_provider, oauth_id
-        )
-        logger.info(user_id)
+        await user_services.create_user(name, email, None, auth_provider, oauth_id)
         return email
 
     @staticmethod
     async def login_user(email: str, password: str):
-        url = f"https://{settings.AUTH0_DOMAIN}/oauth/token"
+        url = f"https://{settings.auth.AUTH0_DOMAIN}/oauth/token"
         payload = {
             "grant_type": "password",
             "username": email,
             "password": password,
-            "audience": settings.API_AUDIENCE,
-            "client_id": settings.CLIENT_ID,
+            "audience": settings.auth.API_AUDIENCE,
+            "client_id": settings.auth.CLIENT_ID,
             "scope": "openid profile email",
             "connection": "Username-Password-Authentication",
         }
@@ -39,9 +36,9 @@ class Auth0UserServices:
         return response.json()
 
     async def register_user(self, username: str, email: str, password: str):
-        url = f"https://{settings.AUTH0_DOMAIN}/dbconnections/signup"
+        url = f"https://{settings.auth.AUTH0_DOMAIN}/dbconnections/signup"
         payload = {
-            "client_id": settings.CLIENT_ID,
+            "client_id": settings.auth.CLIENT_ID,
             "email": email,
             "password": password,
             "connection": "Username-Password-Authentication",
@@ -55,8 +52,12 @@ class Auth0UserServices:
             logger.error(f"Auth0 login failed: {response}")
             return response
         else:
-            await user_services.create_user(username, email, password, None, None)
             response = await self.login_user(email, password)
+            sub = token_services.get_data_from_token(response["access_token"])[
+                "sub"
+            ].split("|")
+            await user_services.create_user(username, email, password, sub[0], sub[1])
+        logger.info(response)
         return response
 
 

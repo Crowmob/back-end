@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.response_models import MeResponseModel, AuthResponseModel
 from app.schemas.user import SignUpRequestModel, SignInRequestModel
 from app.services.auth_services.basic import basic_auth_services
+from app.core.exceptions.auth_exceptions import UnauthorizedException
 
 basic_auth_router = APIRouter(tags=["Basic Authentication"], prefix="/user")
 
@@ -21,9 +22,7 @@ async def login(data: SignInRequestModel = Depends()):
     if token:
         return AuthResponseModel(status_code=200, message="Logged in", token=token)
     else:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Wrong password."
-        )
+        raise UnauthorizedException(detail="Wrong password.")
 
 
 @basic_auth_router.get("/me", response_model=MeResponseModel)

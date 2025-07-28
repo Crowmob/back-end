@@ -2,12 +2,11 @@ import logging
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.db.unit_of_work import UnitOfWork
-from app.services.password import password_services
+from app.utils.password import password_services
 from app.core.exceptions.user_exceptions import (
     AppException,
     UserWithIdNotFoundException,
     UserWithEmailNotFoundException,
-    UserAlreadyExistsException,
     UserUpdateException,
 )
 
@@ -26,21 +25,40 @@ class UserServices:
         async with UnitOfWork() as uow:
             if password:
                 password = password_services.hash_password(password)
+
             try:
                 user_id = await uow.users.create_user(
-                    username, email, password, auth_provider, oauth_id
+                    username=username,
+                    email=email,
+                    password=password,
                 )
                 logger.info(f"User created: {username}")
-                return user_id
-            except IntegrityError:
-                logger.error(
-                    f"Error creating user: User with email {email} already exists"
-                )
-                raise UserAlreadyExistsException(email)
 
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise
+            except IntegrityError:
+                logger.warning(f"User with email {email} already exists.")
+                await uow.session.rollback()
+
+                user = await uow.users.get_user_by_email(email)
+                if not user:
+                    logger.error(f"User not found by email: {email}")
+                    raise UserWithEmailNotFoundException(email=email)
+
+                user_id = user.id
+
+            if auth_provider and oauth_id:
+                try:
+                    await uow.users.create_identity(
+                        user_id=user_id,
+                        provider=auth_provider,
+                        provider_id=oauth_id,
+                    )
+                    logger.info(f"Created identity for provider {auth_provider}")
+                except IntegrityError:
+                    logger.warning(
+                        f"Identity for provider {auth_provider} already exists."
+                    )
+
+            return user_id
 
     @staticmethod
     async def get_all_users(limit: int | None = None, offset: int | None = None):

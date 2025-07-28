@@ -1,8 +1,8 @@
 from fastapi.security import HTTPAuthorizationCredentials
 from unittest.mock import patch
 
-from app.services.token import token_services
-from app.core.settings_model import settings
+from app.utils.token import token_services
+from app.utils.settings_model import settings
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM

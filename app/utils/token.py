@@ -7,16 +7,14 @@ from jose import jwk as jose_jwk
 from fastapi.security import HTTPBearer
 
 from app.core.exceptions.auth_exceptions import UnauthorizedException
-from app.core.settings_model import settings
+from app.utils.settings_model import settings
 
-AUTH0_DOMAIN = settings.AUTH0_DOMAIN
-API_AUDIENCE = settings.API_AUDIENCE
+AUTH0_DOMAIN = settings.auth.AUTH0_DOMAIN
+API_AUDIENCE = settings.auth.API_AUDIENCE
 ALGORITHM = settings.ALGORITHM
-AUTH0_ALGORITHM = settings.AUTH0_ALGORITHM
+AUTH0_ALGORITHM = settings.auth.AUTH0_ALGORITHM
 
 auth_scheme = HTTPBearer()
-
-jwks = requests.get(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json").json()
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +22,7 @@ logger = logging.getLogger(__name__)
 class TokenServices:
     @staticmethod
     def decode_auth0_token(token: str):
+        jwks = requests.get(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json").json()
         try:
             header = jwt.get_unverified_header(token)
         except Exception:

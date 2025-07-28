@@ -5,7 +5,7 @@ from app.routers.main_router import main_router
 from app.routers.user_router import user_router
 from app.routers.basic_auth_router import basic_auth_router
 from app.routers.auth_router import auth_router
-from app.core.settings_model import settings
+from app.utils.settings_model import settings
 
 app = FastAPI(version="1.0", description="Internship project")
 

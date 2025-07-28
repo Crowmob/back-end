@@ -2,7 +2,7 @@ from fastapi import APIRouter, Body, Header
 import logging
 
 from app.services.auth_services.auth0 import auth0_user_services
-from app.services.token import token_services
+from app.utils.token import token_services
 from app.schemas.response_models import ResponseModel
 from app.schemas.user import SignInRequestModel, SignUpRequestModel, Username
 

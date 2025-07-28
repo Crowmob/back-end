@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy import insert
 from app.services.user import user_services
 from app.db.unit_of_work import UnitOfWork
-from app.core.settings_model import settings
+from app.utils.settings_model import settings
 from app.models.user_model import User
 from app.utils.db import truncate_users_table
 

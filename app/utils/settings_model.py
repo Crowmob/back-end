@@ -24,6 +24,14 @@ class RedisConfig(BaseConfig):
     HOST: str = Field(..., alias="REDIS_HOST")
 
 
+class AuthConfig(BaseConfig):
+    AUTH0_ALGORITHM: str
+    AUTH0_DOMAIN: str
+    API_AUDIENCE: str
+    CLIENT_ID: str
+    CLIENT_SECRET: str
+
+
 class Settings(BaseConfig):
     ENV: str
     HOST: str
@@ -32,15 +40,11 @@ class Settings(BaseConfig):
     REACT_URL: str
     SECRET_KEY: str
     ALGORITHM: str
-    AUTH0_ALGORITHM: str
-    AUTH0_DOMAIN: str
-    API_AUDIENCE: str
-    CLIENT_ID: str
-    CLIENT_SECRET: str
     EXP_TIME: int
 
     db: PostgresConfig = PostgresConfig()
     redis: RedisConfig = RedisConfig()
+    auth: AuthConfig = AuthConfig()
 
 
 settings = Settings()
