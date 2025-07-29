@@ -8,6 +8,7 @@ from app.core.exceptions.user_exceptions import (
     UserWithIdNotFoundException,
     UserWithEmailNotFoundException,
     UserUpdateException,
+    IdentityAlreadyExistsError,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,25 +47,28 @@ class UserServices:
                 user_id = user.id
 
             if auth_provider and oauth_id:
-                try:
+                exists = await uow.users.identity_exists(oauth_id)
+                if exists:
+                    logger.warning(
+                        f"Identity for provider {auth_provider} already exists."
+                    )
+                else:
                     await uow.users.create_identity(
                         user_id=user_id,
                         provider=auth_provider,
                         provider_id=oauth_id,
                     )
                     logger.info(f"Created identity for provider {auth_provider}")
-                except IntegrityError:
-                    logger.warning(
-                        f"Identity for provider {auth_provider} already exists."
-                    )
 
             return user_id
 
     @staticmethod
-    async def get_all_users(limit: int | None = None, offset: int | None = None):
+    async def get_all_users(
+        limit: int | None = None, offset: int | None = None, sub: str | None = None
+    ):
         async with UnitOfWork() as uow:
             try:
-                users = await uow.users.get_all_users(limit, offset)
+                users = await uow.users.get_all_users(limit, offset, sub.split("|")[0])
                 logger.info("Fetched users")
                 return users
 

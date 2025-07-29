@@ -30,6 +30,14 @@ class UserAlreadyExistsException(AppException):
         )
 
 
+class IdentityAlreadyExistsError(AppException):
+    def __init__(self, provider: str):
+        super().__init__(
+            detail=f"Identity with '{provider}' already exists",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+
 class UserUpdateException(AppException):
     def __init__(self, user_id: int):
         super().__init__(

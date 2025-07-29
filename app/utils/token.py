@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class TokenServices:
     @staticmethod
-    def decode_auth0_token(token: str):
+    async def decode_auth0_token(token: str):
         jwks = requests.get(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json").json()
         try:
             header = jwt.get_unverified_header(token)
@@ -57,7 +57,10 @@ class TokenServices:
             raise UnauthorizedException(detail="Incorrect claims.")
 
     async def get_data_from_token(self, token: str):
-        data = self.decode_auth0_token(token)
+        if token:
+            data = await self.decode_auth0_token(token)
+        else:
+            data = {"sub": "|"}
         logger.info(data)
         return data
 
