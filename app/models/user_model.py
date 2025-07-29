@@ -1,5 +1,5 @@
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String, Integer, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import String, ForeignKey
 
 from app.models.base import Base, IDMixin, TimestampMixin
 
@@ -12,6 +12,7 @@ class User(IDMixin, TimestampMixin, Base):
         String(255), unique=True, nullable=False, index=True
     )
     password: Mapped[str | None] = mapped_column(String, nullable=True)
+    identities = relationship("Identities", back_populates="user", uselist=True)
 
 
 class Identities(IDMixin, Base):
@@ -21,4 +22,5 @@ class Identities(IDMixin, Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     provider: Mapped[str] = mapped_column(String(50), nullable=False)
-    provider_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    provider_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    user = relationship("User", back_populates="identities")

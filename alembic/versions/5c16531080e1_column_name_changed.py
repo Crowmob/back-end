@@ -23,7 +23,6 @@ def upgrade() -> None:
     op.drop_index(op.f("ix_users_oauth_sub"), table_name="users")
     op.create_index(op.f("ix_users_oauth_id"), "users", ["oauth_id"], unique=True)
     op.drop_column("users", "oauth_sub")
-    # ### end Alembic commands ###
 
 
 def downgrade() -> None:

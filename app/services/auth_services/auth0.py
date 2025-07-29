@@ -53,7 +53,7 @@ class Auth0UserServices:
             return response
         else:
             response = await self.login_user(email, password)
-            sub = token_services.get_data_from_token(response["access_token"])[
+            sub = await token_services.get_data_from_token(response["access_token"])[
                 "sub"
             ].split("|")
             await user_services.create_user(username, email, password, sub[0], sub[1])

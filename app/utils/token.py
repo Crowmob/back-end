@@ -56,7 +56,7 @@ class TokenServices:
             logger.error("Incorrect claims")
             raise UnauthorizedException(detail="Incorrect claims.")
 
-    def get_data_from_token(self, token: str):
+    async def get_data_from_token(self, token: str):
         data = self.decode_auth0_token(token)
         logger.info(data)
         return data

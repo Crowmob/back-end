@@ -52,7 +52,7 @@ async def update_user_endpoint(
 @user_router.delete("/", response_model=ResponseModel)
 async def delete_user_endpoint(authorization: str = Header(...)):
     token = authorization.removeprefix("Bearer ")
-    data = token_services.get_data_from_token(token)
+    data = await token_services.get_data_from_token(token)
     user_id = data["sub"].split("|")[1]
     await user_services.delete_user(user_id)
     return ResponseModel(
