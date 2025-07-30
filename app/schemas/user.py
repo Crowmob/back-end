@@ -12,8 +12,6 @@ class UserSchema(BaseModel):
     username: str | None = None
     email: str
     password: str | None = None
-    provider: str | None = None
-    provider_id: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -52,6 +50,4 @@ class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
     username: str | None = None
     email: str
     password: str | None = None
-    provider: str | None = None
-    provider_id: str | None = None
     model_config = ConfigDict(from_attributes=True)

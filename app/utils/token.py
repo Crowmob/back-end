@@ -1,4 +1,4 @@
-import requests
+import httpx
 import logging
 
 from datetime import datetime, timedelta
@@ -22,7 +22,13 @@ logger = logging.getLogger(__name__)
 class TokenServices:
     @staticmethod
     async def decode_auth0_token(token: str):
-        jwks = requests.get(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json").json()
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json")
+                jwks = resp.json()
+            except Exception:
+                logger.exception("Failed to fetch JWKS")
+                raise UnauthorizedException(detail="Failed to fetch JWKS")
         try:
             header = jwt.get_unverified_header(token)
         except Exception:

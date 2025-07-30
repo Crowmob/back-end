@@ -63,12 +63,10 @@ class UserServices:
             return user_id
 
     @staticmethod
-    async def get_all_users(
-        limit: int | None = None, offset: int | None = None, sub: str | None = None
-    ):
+    async def get_all_users(limit: int | None = None, offset: int | None = None):
         async with UnitOfWork() as uow:
             try:
-                users = await uow.users.get_all_users(limit, offset, sub.split("|")[0])
+                users = await uow.users.get_all_users(limit, offset)
                 logger.info("Fetched users")
                 return users
 

@@ -25,15 +25,8 @@ async def get_user_by_email_endpoint(email: str):
 
 
 @user_router.get("/", response_model=ListResponse[UserDetailResponse])
-async def get_all_users_endpoint(
-    body: GetAllUsersRequestModel = Depends(), authorization: str = Header(None)
-):
-    if not authorization:
-        data = {"sub": "|"}
-    else:
-        token = authorization.removeprefix("Bearer ")
-        data = await token_services.get_data_from_token(token)
-    return await user_services.get_all_users(body.limit, body.offset, data["sub"])
+async def get_all_users_endpoint(data: GetAllUsersRequestModel = Depends()):
+    return await user_services.get_all_users(data.limit, data.offset)
 
 
 @user_router.post("/", response_model=ResponseModel)
