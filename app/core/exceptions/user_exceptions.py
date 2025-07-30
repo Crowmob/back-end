@@ -6,10 +6,18 @@ class AppException(HTTPException):
         super().__init__(status_code=status_code, detail=detail)
 
 
-class UserNotFoundException(AppException):
+class UserWithIdNotFoundException(AppException):
     def __init__(self, user_id: int):
         super().__init__(
             detail=f"User with ID {user_id} not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+
+class UserWithEmailNotFoundException(AppException):
+    def __init__(self, email: str):
+        super().__init__(
+            detail=f"User with email {email} not found",
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
@@ -18,6 +26,14 @@ class UserAlreadyExistsException(AppException):
     def __init__(self, email: str):
         super().__init__(
             detail=f"User with email '{email}' already exists",
+            status_code=status.HTTP_409_CONFLICT,
+        )
+
+
+class IdentityAlreadyExistsError(AppException):
+    def __init__(self, provider: str):
+        super().__init__(
+            detail=f"Identity with '{provider}' already exists",
             status_code=status.HTTP_409_CONFLICT,
         )
 

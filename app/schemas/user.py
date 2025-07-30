@@ -9,10 +9,14 @@ T = TypeVar("T")
 
 
 class UserSchema(BaseModel):
-    username: str
+    username: str | None = None
     email: str
-    password: str
+    password: str | None = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class Username(BaseModel):
+    name: str | None = None
 
 
 class SignUpRequestModel(BaseModel):
@@ -22,13 +26,12 @@ class SignUpRequestModel(BaseModel):
 
 
 class SignInRequestModel(BaseModel):
-    username: str
+    email: str
     password: str
 
 
 class UserUpdateRequestModel(BaseModel):
     username: str | None = None
-    email: str | None = None
     password: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -44,6 +47,7 @@ class ListResponse(GenericModel, Generic[T]):
 
 
 class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
-    username: str
+    username: str | None = None
     email: str
+    password: str | None = None
     model_config = ConfigDict(from_attributes=True)

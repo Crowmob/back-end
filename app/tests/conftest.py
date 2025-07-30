@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy import insert
 from app.services.user import user_services
 from app.db.unit_of_work import UnitOfWork
-from app.core.settings_model import settings
+from app.utils.settings_model import settings
 from app.models.user_model import User
 from app.utils.db import truncate_users_table
 
@@ -36,8 +36,8 @@ async def test_user(db_session):
     result = await db_session.execute(
         insert(User)
         .values(username="test", email="test@example.com", password="1234")
-        .returning(User.id)
+        .returning(User.id, User.email)
     )
-    user_id = result.scalar_one()
+    user_id, email = result.one()
     await db_session.commit()
-    return user_id
+    return {"id": user_id, "email": email}
