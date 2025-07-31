@@ -16,7 +16,7 @@ async def auth_user(body: Username = Body(...), authorization: str = Header(...)
     token = authorization.removeprefix("Bearer ")
     data = await token_services.get_data_from_token(token)
     email = await auth0_user_services.auth_user(
-        body.name, data["http://localhost:8000/email"], data["sub"]
+        body.name, body.avatar, data["http://localhost:8000/email"], data["sub"]
     )
     return ResponseModel(
         status_code=200,

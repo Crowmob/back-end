@@ -8,7 +8,6 @@ from app.core.exceptions.user_exceptions import (
     UserWithIdNotFoundException,
     UserWithEmailNotFoundException,
     UserUpdateException,
-    IdentityAlreadyExistsError,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,16 +21,16 @@ class UserServices:
         password: str | None,
         auth_provider: str | None,
         oauth_id: str | None,
+        avatar: bytes | None = None,
     ):
         async with UnitOfWork() as uow:
             if password:
                 password = password_services.hash_password(password)
 
             try:
+                logger.info(avatar)
                 user_id = await uow.users.create_user(
-                    username=username,
-                    email=email,
-                    password=password,
+                    username=username, email=email, password=password, avatar=avatar
                 )
                 logger.info(f"User created: {username}")
 
@@ -75,9 +74,11 @@ class UserServices:
                 raise
 
     @staticmethod
-    async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
+    async def get_user_by_id_with_uow(
+        user_id: int, uow: UnitOfWork, get_avatar: bool = False
+    ):
         try:
-            user = await uow.users.get_user_by_id(user_id)
+            user = await uow.users.get_user_by_id(user_id, get_avatar)
             if not user:
                 logger.warning(f"No user found with id={user_id}")
                 raise UserWithIdNotFoundException(user_id)
@@ -88,9 +89,9 @@ class UserServices:
             logger.info(f"SQLAlchemy error: {e}")
             raise
 
-    async def get_user_by_id(self, user_id: int):
+    async def get_user_by_id(self, user_id: int, get_avatar: bool = False):
         async with UnitOfWork() as uow:
-            return await self.get_user_by_id_with_uow(user_id, uow)
+            return await self.get_user_by_id_with_uow(user_id, uow, get_avatar)
 
     @staticmethod
     async def get_user_by_email(email: str):
@@ -107,7 +108,14 @@ class UserServices:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise
 
-    async def update_user(self, user_id: int, username: str, password: str):
+    async def update_user(
+        self,
+        user_id: int,
+        username: str | None = None,
+        password: str | None = None,
+        about: str | None = None,
+        avatar: bytes | None = None,
+    ):
         async with UnitOfWork() as uow:
             await self.get_user_by_id_with_uow(user_id, uow)
             if password:
@@ -115,10 +123,13 @@ class UserServices:
             values_to_update = {
                 "username": username,
                 "password": password,
+                "about": about,
+                "avatar": avatar,
             }
             for key in list(values_to_update.keys()):
                 if values_to_update[key] is None:
                     values_to_update.pop(key)
+            logger.info(values_to_update)
             try:
                 await uow.users.update_user(user_id, values_to_update)
 

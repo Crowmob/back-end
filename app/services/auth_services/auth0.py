@@ -10,11 +10,16 @@ logger = logging.getLogger(__name__)
 
 class Auth0UserServices:
     @staticmethod
-    async def auth_user(name: str, email: str, sub: str):
+    async def auth_user(name: str, avatar: str, email: str, sub: str):
         sub = sub.split("|")
         auth_provider = sub[0]
         oauth_id = sub[1]
-        await user_services.create_user(name, email, None, auth_provider, oauth_id)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(avatar)
+            response.raise_for_status()
+        await user_services.create_user(
+            name, email, None, auth_provider, oauth_id, response.content
+        )
         return email
 
     @staticmethod

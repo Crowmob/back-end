@@ -20,7 +20,7 @@ def test_create_and_decode_token():
 
 
 @pytest.mark.asyncio
-@patch("app.services.token.TokenServices.decode_auth0_token")
+@patch("app.utils.token.TokenServices.decode_auth0_token")
 async def test_get_data_from_token(mock_decode):
     mock_decode.return_value = {"id": 1}
 
@@ -31,10 +31,10 @@ async def test_get_data_from_token(mock_decode):
     assert data["id"] == 1
 
 
-@patch("app.services.token.jwt.get_unverified_header")
-@patch("app.services.token.jwt.decode")
+@patch("app.utils.token.jwt.get_unverified_header")
+@patch("app.utils.token.jwt.decode")
 @patch(
-    "app.services.token.jwks",
+    "app.utils.token.jwks",
     new={
         "keys": [
             {"kid": "test-kid", "kty": "RSA", "use": "sig", "n": "test-n", "e": "AQAB"}

@@ -17,6 +17,7 @@ class UserRepository:
     ) -> ListResponse[UserDetailResponse]:
         stmt = (
             select(User, func.count().over().label("total_count"))
+            .where(User.has_profile)
             .offset(offset or 0)
             .limit(limit or 10)
         )
@@ -34,21 +35,27 @@ class UserRepository:
                 id=user.id,
                 username=user.username,
                 email=user.email,
-                password=user.password,
-                created_at=user.created_at,
-                updated_at=user.updated_at,
+                avatar=f"http://127.0.0.1:8000/users/{user.id}/avatar"
+                if user.avatar
+                else None,
             )
             for user, _ in rows
         ]
 
         return ListResponse[UserDetailResponse](items=items, count=total_count)
 
-    async def get_user_by_id(self, user_id: int) -> UserDetailResponse | None:
+    async def get_user_by_id(self, user_id: int, get_avatar: bool = False):
         result = await self.session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
-        if user:
-            return UserDetailResponse.model_validate(user)
-        return None
+        if not user:
+            return None
+        if get_avatar:
+            return user
+        user_dict = user.__dict__.copy()
+        user_dict["avatar"] = (
+            f"http://127.0.0.1:8000/users/{user.id}/avatar" if user.avatar else None
+        )
+        return UserDetailResponse.model_validate(user_dict)
 
     async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
         result = await self.session.execute(select(User).where(User.email == email))
@@ -62,11 +69,10 @@ class UserRepository:
         username: str | None,
         email: str,
         password: str | None,
+        avatar: bytes | None = None,
     ) -> int:
         new_user = User(
-            username=username,
-            email=email,
-            password=password,
+            username=username, email=email, password=password, avatar=avatar
         )
         self.session.add(new_user)
         await self.session.flush()
@@ -98,4 +104,8 @@ class UserRepository:
         )
 
     async def delete_user(self, user_id: int) -> None:
-        await self.session.execute(delete(User).where(User.id == user_id))
+        await self.session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(**{"about": None, "has_profile": False})
+        )
