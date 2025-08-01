@@ -74,11 +74,9 @@ class UserServices:
                 raise
 
     @staticmethod
-    async def get_user_by_id_with_uow(
-        user_id: int, uow: UnitOfWork, get_avatar: bool = False
-    ):
+    async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
         try:
-            user = await uow.users.get_user_by_id(user_id, get_avatar)
+            user = await uow.users.get_user_by_id(user_id)
             if not user:
                 logger.warning(f"No user found with id={user_id}")
                 raise UserWithIdNotFoundException(user_id)
@@ -89,9 +87,9 @@ class UserServices:
             logger.info(f"SQLAlchemy error: {e}")
             raise
 
-    async def get_user_by_id(self, user_id: int, get_avatar: bool = False):
+    async def get_user_by_id(self, user_id: int):
         async with UnitOfWork() as uow:
-            return await self.get_user_by_id_with_uow(user_id, uow, get_avatar)
+            return await self.get_user_by_id_with_uow(user_id, uow)
 
     @staticmethod
     async def get_user_by_email(email: str):

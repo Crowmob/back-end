@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Body, Header
 import logging
+
+from fastapi import APIRouter, Header, UploadFile, File, Form
 
 from app.services.auth_services.auth0 import auth0_user_services
 from app.utils.token import token_services
@@ -12,11 +13,15 @@ logger = logging.getLogger(__name__)
 
 
 @auth_router.post("/", response_model=ResponseModel)
-async def auth_user(body: Username = Body(...), authorization: str = Header(...)):
+async def auth_user(
+    avatar: UploadFile = File(None),
+    name: str = Form(...),
+    authorization: str = Header(...),
+):
     token = authorization.removeprefix("Bearer ")
     data = await token_services.get_data_from_token(token)
     email = await auth0_user_services.auth_user(
-        body.name, body.avatar, data["http://localhost:8000/email"], data["sub"]
+        name, await avatar.read(), data["http://localhost:8000/email"], data["sub"]
     )
     return ResponseModel(
         status_code=200,

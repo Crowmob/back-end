@@ -26,7 +26,7 @@ class SignUpRequestModel(BaseModel):
     username: str
     email: str
     password: str
-    avatar: HttpUrl | None
+    avatar: HttpUrl | None = None
 
 
 class SignInRequestModel(BaseModel):
@@ -56,5 +56,6 @@ class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
     email: str
     about: str | None = None
     avatar: str | None = None
+    mime_type: str | None = None
     current_user: bool | None = False
     model_config = ConfigDict(from_attributes=True)

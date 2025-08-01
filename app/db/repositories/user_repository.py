@@ -1,6 +1,9 @@
+import base64
+import magic
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete, func
+from sqlalchemy import update, func
 
 from app.models.user_model import User, Identities
 from app.schemas.user import UserDetailResponse, ListResponse
@@ -14,7 +17,7 @@ class UserRepository:
         self,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ListResponse[UserDetailResponse]:
+    ):
         stmt = (
             select(User, func.count().over().label("total_count"))
             .where(User.has_profile)
@@ -29,13 +32,15 @@ class UserRepository:
             return ListResponse[UserDetailResponse](items=[], count=0)
 
         total_count = rows[0][1]
-
         items = [
             UserDetailResponse(
                 id=user.id,
                 username=user.username,
                 email=user.email,
-                avatar=f"http://127.0.0.1:8000/users/{user.id}/avatar"
+                avatar=base64.b64encode(user.avatar).decode("utf-8")
+                if user.avatar
+                else None,
+                mime_type=magic.from_buffer(user.avatar, mime=True)
                 if user.avatar
                 else None,
             )
@@ -44,17 +49,15 @@ class UserRepository:
 
         return ListResponse[UserDetailResponse](items=items, count=total_count)
 
-    async def get_user_by_id(self, user_id: int, get_avatar: bool = False):
+    async def get_user_by_id(self, user_id: int):
         result = await self.session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
             return None
-        if get_avatar:
-            return user
         user_dict = user.__dict__.copy()
-        user_dict["avatar"] = (
-            f"http://127.0.0.1:8000/users/{user.id}/avatar" if user.avatar else None
-        )
+        if user.avatar:
+            user_dict["avatar"] = base64.b64encode(user.avatar).decode("utf-8")
+            user_dict["mime_type"] = magic.from_buffer(user.avatar, mime=True)
         return UserDetailResponse.model_validate(user_dict)
 
     async def get_user_by_email(self, email: int) -> UserDetailResponse | None:

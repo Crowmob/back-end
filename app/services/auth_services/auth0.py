@@ -1,5 +1,5 @@
-import httpx
 import logging
+import httpx
 
 from app.services.user import user_services
 from app.utils.settings_model import settings
@@ -14,11 +14,8 @@ class Auth0UserServices:
         sub = sub.split("|")
         auth_provider = sub[0]
         oauth_id = sub[1]
-        async with httpx.AsyncClient() as client:
-            response = await client.get(avatar)
-            response.raise_for_status()
         await user_services.create_user(
-            name, email, None, auth_provider, oauth_id, response.content
+            name, email, None, auth_provider, oauth_id, avatar
         )
         return email
 
@@ -58,9 +55,8 @@ class Auth0UserServices:
             return response
         else:
             response = await self.login_user(email, password)
-            sub = await token_services.get_data_from_token(response["access_token"])[
-                "sub"
-            ].split("|")
+            data = await token_services.get_data_from_token(response["access_token"])
+            sub = data["sub"].split("|")
             await user_services.create_user(username, email, password, sub[0], sub[1])
         logger.info(response)
         return response
