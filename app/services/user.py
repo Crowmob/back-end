@@ -9,6 +9,7 @@ from app.core.exceptions.user_exceptions import (
     UserWithEmailNotFoundException,
     UserUpdateException,
 )
+from app.services.company import company_services
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,9 @@ class UserServices:
                 logger.info(avatar)
                 user_id = await uow.users.create_user(
                     username=username, email=email, password=password, avatar=avatar
+                )
+                await company_services.create_company_with_uow(
+                    user_id, "Company", "description", True, uow
                 )
                 logger.info(f"User created: {username}")
 

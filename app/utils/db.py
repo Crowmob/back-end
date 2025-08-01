@@ -5,3 +5,8 @@ from sqlalchemy import text
 async def truncate_users_table(session: AsyncSession):
     await session.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE;"))
     await session.commit()
+
+
+async def truncate_companies_table(session: AsyncSession):
+    await session.execute(text("TRUNCATE TABLE companies RESTART IDENTITY CASCADE;"))
+    await session.commit()
