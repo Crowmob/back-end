@@ -1,4 +1,7 @@
-import magic
+import os
+import shutil
+import glob
+
 from fastapi import APIRouter, Depends, Header, Response, Form, UploadFile, File
 
 from app.services.user import user_services
@@ -52,10 +55,17 @@ async def update_user_endpoint(
     about: str = Form(...),
     avatar: UploadFile = File(None),
 ):
-    avatar_bytes = None
-    if avatar:
-        avatar_bytes = await avatar.read()
-    await user_services.update_user(user_id, username, about=about, avatar=avatar_bytes)
+    ext = avatar.filename.split(".")[-1]
+    filename = f"{user_id}.{ext}"
+    filepath = os.path.join("static/avatars/", filename)
+    pattern = f"/static/avatars/{user_id}.*"
+    matches = glob.glob(pattern)
+    if matches:
+        for file_path in matches:
+            os.remove(file_path)
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(avatar.file, buffer)
+    await user_services.update_user(user_id, username, about=about, avatar_ext=ext)
     return ResponseModel(
         status_code=200, message=f"Successfully updated user with id: {user_id}!"
     )

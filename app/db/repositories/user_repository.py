@@ -1,6 +1,3 @@
-import base64
-import magic
-
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, func
@@ -37,12 +34,7 @@ class UserRepository:
                 id=user.id,
                 username=user.username,
                 email=user.email,
-                avatar=base64.b64encode(user.avatar).decode("utf-8")
-                if user.avatar
-                else None,
-                mime_type=magic.from_buffer(user.avatar, mime=True)
-                if user.avatar
-                else None,
+                avatar_ext=user.avatar_ext,
             )
             for user, _ in rows
         ]
@@ -54,11 +46,7 @@ class UserRepository:
         user = result.scalar_one_or_none()
         if not user:
             return None
-        user_dict = user.__dict__.copy()
-        if user.avatar:
-            user_dict["avatar"] = base64.b64encode(user.avatar).decode("utf-8")
-            user_dict["mime_type"] = magic.from_buffer(user.avatar, mime=True)
-        return UserDetailResponse.model_validate(user_dict)
+        return UserDetailResponse.model_validate(user)
 
     async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
         result = await self.session.execute(select(User).where(User.email == email))
@@ -72,10 +60,10 @@ class UserRepository:
         username: str | None,
         email: str,
         password: str | None,
-        avatar: bytes | None = None,
+        avatar_ext: str | None = None,
     ) -> int:
         new_user = User(
-            username=username, email=email, password=password, avatar=avatar
+            username=username, email=email, password=password, avatar_ext=avatar_ext
         )
         self.session.add(new_user)
         await self.session.flush()

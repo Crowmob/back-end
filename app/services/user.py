@@ -21,16 +21,18 @@ class UserServices:
         password: str | None,
         auth_provider: str | None,
         oauth_id: str | None,
-        avatar: bytes | None = None,
+        avatar_ext: str | None = None,
     ):
         async with UnitOfWork() as uow:
             if password:
                 password = password_services.hash_password(password)
 
             try:
-                logger.info(avatar)
                 user_id = await uow.users.create_user(
-                    username=username, email=email, password=password, avatar=avatar
+                    username=username,
+                    email=email,
+                    password=password,
+                    avatar_ext=avatar_ext,
                 )
                 logger.info(f"User created: {username}")
 
@@ -112,7 +114,7 @@ class UserServices:
         username: str | None = None,
         password: str | None = None,
         about: str | None = None,
-        avatar: bytes | None = None,
+        avatar_ext: str | None = None,
     ):
         async with UnitOfWork() as uow:
             await self.get_user_by_id_with_uow(user_id, uow)
@@ -122,7 +124,7 @@ class UserServices:
                 "username": username,
                 "password": password,
                 "about": about,
-                "avatar": avatar,
+                "avatar_ext": avatar_ext,
             }
             for key in list(values_to_update.keys()):
                 if values_to_update[key] is None:

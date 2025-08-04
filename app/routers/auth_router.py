@@ -1,4 +1,5 @@
 import logging
+import shutil
 
 from fastapi import APIRouter, Header, UploadFile, File, Form
 
@@ -20,12 +21,17 @@ async def auth_user(
 ):
     token = authorization.removeprefix("Bearer ")
     data = await token_services.get_data_from_token(token)
-    email = await auth0_user_services.auth_user(
-        name, await avatar.read(), data["http://localhost:8000/email"], data["sub"]
+    user_id, filepath = await auth0_user_services.auth_user(
+        name,
+        avatar.filename.split(".")[-1],
+        data["http://localhost:8000/email"],
+        data["sub"],
     )
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(avatar.file, buffer)
     return ResponseModel(
         status_code=200,
-        message=f"Successfully authenticated user with email: {email}",
+        message=f"Successfully authenticated user with email: {user_id}",
     )
 
 

@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: b0df3740ffd0
+Revision ID: 3824759e28f0
 Revises:
-Create Date: 2025-08-01 18:09:07.408019
+Create Date: 2025-08-04 09:02:24.475002
 
 """
 
@@ -11,7 +11,8 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "b0df3740ffd0"
+
+revision: str = "3824759e28f0"
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,7 +25,7 @@ def upgrade() -> None:
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password", sa.String(), nullable=True),
         sa.Column("about", sa.String(length=512), nullable=True),
-        sa.Column("avatar", sa.LargeBinary(), nullable=True),
+        sa.Column("avatar_ext", sa.String(length=32), nullable=True),
         sa.Column("has_profile", sa.Boolean(), nullable=False),
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column(
@@ -44,22 +45,13 @@ def upgrade() -> None:
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
     op.create_index(op.f("ix_users_id"), "users", ["id"], unique=False)
     op.create_index(op.f("ix_users_username"), "users", ["username"], unique=False)
-    op.create_table(
-        "identities",
-        sa.Column("user_id", sa.Integer(), nullable=False),
-        sa.Column("provider", sa.String(length=50), nullable=False),
-        sa.Column("provider_id", sa.String(length=255), nullable=False),
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("provider_id"),
+    op.create_foreign_key(
+        None, "identities", "users", ["user_id"], ["id"], ondelete="CASCADE"
     )
-    op.create_index(op.f("ix_identities_id"), "identities", ["id"], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_identities_id"), table_name="identities")
-    op.drop_table("identities")
+    op.drop_constraint(None, "identities", type_="foreignkey")
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index(op.f("ix_users_id"), table_name="users")
     op.drop_index(op.f("ix_users_email"), table_name="users")
