@@ -73,4 +73,4 @@ async def test_delete_user(db_session, user_services_fixture, test_user):
     await user_services_fixture.delete_user(test_user["id"])
 
     user = await db_session.scalar(select(User).where(User.id == test_user["id"]))
-    assert user is None
+    assert user.has_profile is False

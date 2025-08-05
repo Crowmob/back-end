@@ -1,5 +1,10 @@
 import logging
+import os
+import glob
+import aiofiles
+
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from fastapi import UploadFile, File
 
 from app.db.unit_of_work import UnitOfWork
 from app.utils.password import password_services
@@ -114,17 +119,31 @@ class UserServices:
         username: str | None = None,
         password: str | None = None,
         about: str | None = None,
-        avatar_ext: str | None = None,
+        avatar: UploadFile | None = None,
     ):
         async with UnitOfWork() as uow:
             await self.get_user_by_id_with_uow(user_id, uow)
+            if avatar:
+                ext = avatar.filename.split(".")[-1]
+                filename = f"{user_id}.{ext}"
+                filepath = os.path.join("static/avatars/", filename)
+                pattern = f"/static/avatars/{user_id}.*"
+                matches = glob.glob(pattern)
+                if matches:
+                    for file_path in matches:
+                        os.remove(file_path)
+                async with aiofiles.open(filepath, "wb") as out_file:
+                    while content := await avatar.read(1024):
+                        await out_file.write(content)
+            else:
+                ext = None
             if password:
                 password = password_services.hash_password(password)
             values_to_update = {
                 "username": username,
                 "password": password,
                 "about": about,
-                "avatar_ext": avatar_ext,
+                "avatar_ext": ext,
             }
             for key in list(values_to_update.keys()):
                 if values_to_update[key] is None:

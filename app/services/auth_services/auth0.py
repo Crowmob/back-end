@@ -1,6 +1,9 @@
 import logging
 import httpx
 import os
+import aiofiles
+
+from fastapi import UploadFile
 
 from app.services.user import user_services
 from app.utils.settings_model import settings
@@ -11,16 +14,25 @@ logger = logging.getLogger(__name__)
 
 class Auth0UserServices:
     @staticmethod
-    async def auth_user(name: str, ext: str, email: str, sub: str):
+    async def auth_user(name: str, avatar: UploadFile | None, email: str, sub: str):
         sub = sub.split("|")
         auth_provider = sub[0]
         oauth_id = sub[1]
+        if avatar:
+            ext = avatar.filename.split(".")[-1]
+        else:
+            ext = None
         user_id = await user_services.create_user(
             name, email, None, auth_provider, oauth_id, ext
         )
-        filename = f"{user_id}.{ext}"
-        filepath = os.path.join("static/avatars/", filename)
-        return user_id, filepath
+        filepath = None
+        if ext:
+            filename = f"{user_id}.{ext}"
+            filepath = os.path.join("static/avatars/", filename)
+            async with aiofiles.open(filepath, "wb") as out_file:
+                while content := await avatar.read(1024):
+                    await out_file.write(content)
+        return user_id, filepath if ext else None
 
     @staticmethod
     async def login_user(email: str, password: str):

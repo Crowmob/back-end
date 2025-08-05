@@ -23,12 +23,10 @@ async def auth_user(
     data = await token_services.get_data_from_token(token)
     user_id, filepath = await auth0_user_services.auth_user(
         name,
-        avatar.filename.split(".")[-1],
+        avatar,
         data["http://localhost:8000/email"],
         data["sub"],
     )
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(avatar.file, buffer)
     return ResponseModel(
         status_code=200,
         message=f"Successfully authenticated user with email: {user_id}",
