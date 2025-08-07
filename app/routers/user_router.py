@@ -1,4 +1,7 @@
-import magic
+import os
+import shutil
+import glob
+
 from fastapi import APIRouter, Depends, Header, Response, Form, UploadFile, File
 
 from app.services.user import user_services
@@ -52,10 +55,9 @@ async def update_user_endpoint(
     about: str = Form(...),
     avatar: UploadFile = File(None),
 ):
-    avatar_bytes = None
-    if avatar:
-        avatar_bytes = await avatar.read()
-    await user_services.update_user(user_id, username, about=about, avatar=avatar_bytes)
+    await user_services.update_user(
+        user_id, username, about=about, avatar_ext=avatar.filename.split(".")[-1]
+    )
     return ResponseModel(
         status_code=200, message=f"Successfully updated user with id: {user_id}!"
     )
@@ -67,12 +69,3 @@ async def delete_user_endpoint(user_id: int):
     return ResponseModel(
         status_code=200, message=f"Successfully deleted user with id: {user_id}!"
     )
-
-
-@user_router.get("/{user_id}/avatar")
-async def get_user_avatar(user_id: int):
-    user = await user_services.get_user_by_id(user_id, True)
-    if user and user.avatar:
-        mime_type = magic.from_buffer(user.avatar, mime=True)
-        return Response(content=user.avatar, media_type=mime_type)
-    return ResponseModel(status_code=404, message="No avatar")

@@ -13,7 +13,7 @@ class UserSchema(BaseModel):
     email: str
     password: str | None = None
     about: str | None = None
-    avatar: str | None = None
+    avatar_ext: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -26,7 +26,7 @@ class SignUpRequestModel(BaseModel):
     username: str
     email: str
     password: str
-    avatar: HttpUrl | None
+    avatar: HttpUrl | None = None
 
 
 class SignInRequestModel(BaseModel):
@@ -55,6 +55,6 @@ class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
     username: str | None = None
     email: str
     about: str | None = None
-    avatar: str | None = None
+    avatar_ext: str | None = None
     current_user: bool | None = False
     model_config = ConfigDict(from_attributes=True)

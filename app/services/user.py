@@ -1,5 +1,10 @@
 import logging
+import os
+import glob
+import aiofiles
+
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from fastapi import UploadFile, File
 
 from app.db.unit_of_work import UnitOfWork
 from app.utils.password import password_services
@@ -22,16 +27,18 @@ class UserServices:
         password: str | None,
         auth_provider: str | None,
         oauth_id: str | None,
-        avatar: bytes | None = None,
+        avatar_ext: str | None = None,
     ):
         async with UnitOfWork() as uow:
             if password:
                 password = password_services.hash_password(password)
 
             try:
-                logger.info(avatar)
                 user_id = await uow.users.create_user(
-                    username=username, email=email, password=password, avatar=avatar
+                    username=username,
+                    email=email,
+                    password=password,
+                    avatar_ext=avatar_ext,
                 )
                 await company_services.create_company_with_uow(
                     user_id, "Company", "description", True, uow
@@ -78,11 +85,9 @@ class UserServices:
                 raise
 
     @staticmethod
-    async def get_user_by_id_with_uow(
-        user_id: int, uow: UnitOfWork, get_avatar: bool = False
-    ):
+    async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
         try:
-            user = await uow.users.get_user_by_id(user_id, get_avatar)
+            user = await uow.users.get_user_by_id(user_id)
             if not user:
                 logger.warning(f"No user found with id={user_id}")
                 raise UserWithIdNotFoundException(user_id)
@@ -93,9 +98,9 @@ class UserServices:
             logger.info(f"SQLAlchemy error: {e}")
             raise
 
-    async def get_user_by_id(self, user_id: int, get_avatar: bool = False):
+    async def get_user_by_id(self, user_id: int):
         async with UnitOfWork() as uow:
-            return await self.get_user_by_id_with_uow(user_id, uow, get_avatar)
+            return await self.get_user_by_id_with_uow(user_id, uow)
 
     @staticmethod
     async def get_user_by_email(email: str):
@@ -118,17 +123,31 @@ class UserServices:
         username: str | None = None,
         password: str | None = None,
         about: str | None = None,
-        avatar: bytes | None = None,
+        avatar: UploadFile | None = None,
     ):
         async with UnitOfWork() as uow:
             await self.get_user_by_id_with_uow(user_id, uow)
+            if avatar:
+                ext = avatar.filename.split(".")[-1]
+                filename = f"{user_id}.{ext}"
+                filepath = os.path.join("static/avatars/", filename)
+                pattern = f"/static/avatars/{user_id}.*"
+                matches = glob.glob(pattern)
+                if matches:
+                    for file_path in matches:
+                        os.remove(file_path)
+                async with aiofiles.open(filepath, "wb") as out_file:
+                    while content := await avatar.read(1024):
+                        await out_file.write(content)
+            else:
+                ext = None
             if password:
                 password = password_services.hash_password(password)
             values_to_update = {
                 "username": username,
                 "password": password,
                 "about": about,
-                "avatar": avatar,
+                "avatar_ext": ext,
             }
             for key in list(values_to_update.keys()):
                 if values_to_update[key] is None:
