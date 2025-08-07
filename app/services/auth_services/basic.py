@@ -18,9 +18,8 @@ class BasicAuthServices:
             return token
 
     @staticmethod
-    async def get_me(token: str):
-        data = token_services.decode_token(token)
-        user = await user_services.get_user_by_id(data["id"])
+    async def get_me(email: str):
+        user = await user_services.get_user_by_email(email)
         return user
 
 
