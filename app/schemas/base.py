@@ -7,5 +7,5 @@ class IDMixin(BaseModel):
 
 
 class TimestampMixin(BaseModel):
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

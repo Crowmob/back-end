@@ -1,5 +1,9 @@
-import httpx
 import logging
+import httpx
+import os
+import aiofiles
+
+from fastapi import UploadFile
 
 from app.services.user import user_services
 from app.utils.settings_model import settings
@@ -10,12 +14,25 @@ logger = logging.getLogger(__name__)
 
 class Auth0UserServices:
     @staticmethod
-    async def auth_user(name: str, email: str, sub: str):
+    async def auth_user(name: str, avatar: UploadFile | None, email: str, sub: str):
         sub = sub.split("|")
         auth_provider = sub[0]
         oauth_id = sub[1]
-        await user_services.create_user(name, email, None, auth_provider, oauth_id)
-        return email
+        if avatar:
+            ext = avatar.filename.split(".")[-1]
+        else:
+            ext = None
+        user_id = await user_services.create_user(
+            name, email, None, auth_provider, oauth_id, ext
+        )
+        filepath = None
+        if ext:
+            filename = f"{user_id}.{ext}"
+            filepath = os.path.join("static/avatars/", filename)
+            async with aiofiles.open(filepath, "wb") as out_file:
+                while content := await avatar.read(1024):
+                    await out_file.write(content)
+        return user_id, filepath if ext else None
 
     @staticmethod
     async def login_user(email: str, password: str):
@@ -53,9 +70,8 @@ class Auth0UserServices:
             return response
         else:
             response = await self.login_user(email, password)
-            sub = await token_services.get_data_from_token(response["access_token"])[
-                "sub"
-            ].split("|")
+            data = await token_services.get_data_from_token(response["access_token"])
+            sub = data["sub"].split("|")
             await user_services.create_user(username, email, password, sub[0], sub[1])
         logger.info(response)
         return response

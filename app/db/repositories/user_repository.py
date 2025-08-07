@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete, func
+from sqlalchemy import update, func
 
 from app.models.user_model import User, Identities
 from app.schemas.user import UserDetailResponse, ListResponse
@@ -14,9 +14,10 @@ class UserRepository:
         self,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> ListResponse[UserDetailResponse]:
+    ):
         stmt = (
             select(User, func.count().over().label("total_count"))
+            .where(User.has_profile)
             .offset(offset or 0)
             .limit(limit or 10)
         )
@@ -28,27 +29,24 @@ class UserRepository:
             return ListResponse[UserDetailResponse](items=[], count=0)
 
         total_count = rows[0][1]
-
         items = [
             UserDetailResponse(
                 id=user.id,
                 username=user.username,
                 email=user.email,
-                password=user.password,
-                created_at=user.created_at,
-                updated_at=user.updated_at,
+                avatar_ext=user.avatar_ext,
             )
             for user, _ in rows
         ]
 
         return ListResponse[UserDetailResponse](items=items, count=total_count)
 
-    async def get_user_by_id(self, user_id: int) -> UserDetailResponse | None:
+    async def get_user_by_id(self, user_id: int):
         result = await self.session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
-        if user:
-            return UserDetailResponse.model_validate(user)
-        return None
+        if not user:
+            return None
+        return UserDetailResponse.model_validate(user)
 
     async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
         result = await self.session.execute(select(User).where(User.email == email))
@@ -62,11 +60,10 @@ class UserRepository:
         username: str | None,
         email: str,
         password: str | None,
+        avatar_ext: str | None = None,
     ) -> int:
         new_user = User(
-            username=username,
-            email=email,
-            password=password,
+            username=username, email=email, password=password, avatar_ext=avatar_ext
         )
         self.session.add(new_user)
         await self.session.flush()
@@ -98,4 +95,8 @@ class UserRepository:
         )
 
     async def delete_user(self, user_id: int) -> None:
-        await self.session.execute(delete(User).where(User.id == user_id))
+        await self.session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(**{"about": None, "has_profile": False})
+        )

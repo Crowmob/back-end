@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, Header
+import os
+import shutil
+import glob
+
+from fastapi import APIRouter, Depends, Header, Response, Form, UploadFile, File
 
 from app.services.user import user_services
 from app.utils.token import token_services
@@ -15,8 +19,13 @@ user_router = APIRouter(tags=["User CRUD"], prefix="/users")
 
 
 @user_router.get("/{user_id}", response_model=UserDetailResponse)
-async def get_user_by_id_endpoint(user_id: int):
-    return await user_services.get_user_by_id(user_id)
+async def get_user_by_id_endpoint(user_id: int, authorization: str = Header(...)):
+    token = authorization.removeprefix("Bearer ")
+    data = await token_services.get_data_from_token(token)
+    user_data = await user_services.get_user_by_id(user_id)
+    if data["http://localhost:8000/email"] == user_data.email:
+        user_data.current_user = True
+    return user_data
 
 
 @user_router.get("/{email}", response_model=UserDetailResponse)
@@ -30,9 +39,9 @@ async def get_all_users_endpoint(data: GetAllUsersRequestModel = Depends()):
 
 
 @user_router.post("/", response_model=ResponseModel)
-async def create_user_endpoint(user_data: SignUpRequestModel):
+async def create_user_endpoint(data: SignUpRequestModel):
     user_id = await user_services.create_user(
-        user_data.username, user_data.email, user_data.password, None, None
+        data.username, data.email, data.password, None, None, data.avatar
     )
     return ResponseModel(
         status_code=200, message=f"Created user successfully! id: {user_id}"
@@ -41,19 +50,21 @@ async def create_user_endpoint(user_data: SignUpRequestModel):
 
 @user_router.put("/{user_id}", response_model=ResponseModel)
 async def update_user_endpoint(
-    user_id: int, update_data: UserUpdateRequestModel = Depends()
+    user_id: int,
+    username: str = Form(...),
+    about: str = Form(...),
+    avatar: UploadFile = File(None),
 ):
-    await user_services.update_user(user_id, update_data.username, update_data.password)
+    await user_services.update_user(
+        user_id, username, about=about, avatar_ext=avatar.filename.split(".")[-1]
+    )
     return ResponseModel(
         status_code=200, message=f"Successfully updated user with id: {user_id}!"
     )
 
 
-@user_router.delete("/", response_model=ResponseModel)
-async def delete_user_endpoint(authorization: str = Header(...)):
-    token = authorization.removeprefix("Bearer ")
-    data = await token_services.get_data_from_token(token)
-    user_id = data["sub"].split("|")[1]
+@user_router.delete("/{user_id}", response_model=ResponseModel)
+async def delete_user_endpoint(user_id: int):
     await user_services.delete_user(user_id)
     return ResponseModel(
         status_code=200, message=f"Successfully deleted user with id: {user_id}!"
