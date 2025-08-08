@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, ForeignKey, Boolean, LargeBinary
+from sqlalchemy import String, ForeignKey, Boolean
 
 from app.models.base import Base, IDMixin, TimestampMixin
 

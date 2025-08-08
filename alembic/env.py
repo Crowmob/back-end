@@ -7,6 +7,7 @@ from alembic import context
 
 from app.models.user_model import Base
 from app.models.company_model import Company
+from app.models.membership_model import Memberships, MembershipRequests
 from app.utils.settings_model import settings
 
 config = context.config
