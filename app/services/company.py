@@ -13,27 +13,18 @@ logger = logging.getLogger(__name__)
 
 class CompanyServices:
     @staticmethod
-    async def create_company_with_uow(
-        owner: int,
-        name: str,
-        description: str | None = None,
-        private: bool | None = True,
-        uow: UnitOfWork = None,
-    ):
-        await uow.companies.create_company(
-            owner=owner, name=name, description=description, private=private
-        )
-        logger.info(f"Company created: {name}")
-
     async def create_company(
-        self,
         owner: int,
         name: str,
         description: str | None = None,
         private: bool | None = True,
     ):
         async with UnitOfWork() as uow:
-            await self.create_company_with_uow(owner, name, description, private, uow)
+            company_id = await uow.companies.create_company(
+                owner=owner, name=name, description=description, private=private
+            )
+            logger.info(f"Company created: {name}")
+            return company_id
 
     @staticmethod
     async def get_all_companies(limit: int | None = None, offset: int | None = None):

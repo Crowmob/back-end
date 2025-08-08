@@ -4,7 +4,7 @@ import glob
 import aiofiles
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from fastapi import UploadFile, File
+from fastapi import UploadFile
 
 from app.db.unit_of_work import UnitOfWork
 from app.utils.password import password_services
@@ -14,7 +14,6 @@ from app.core.exceptions.user_exceptions import (
     UserWithEmailNotFoundException,
     UserUpdateException,
 )
-from app.services.company import company_services
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +38,6 @@ class UserServices:
                     email=email,
                     password=password,
                     avatar_ext=avatar_ext,
-                )
-                await company_services.create_company_with_uow(
-                    user_id, "Company", "description", True, uow
                 )
                 logger.info(f"User created: {username}")
 

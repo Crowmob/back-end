@@ -1,11 +1,7 @@
-from typing import Generic, TypeVar
-
 from pydantic import BaseModel, ConfigDict, HttpUrl
 from pydantic.generics import GenericModel
 
 from app.schemas.base import IDMixin, TimestampMixin
-
-T = TypeVar("T")
 
 
 class UserSchema(BaseModel):
@@ -13,7 +9,7 @@ class UserSchema(BaseModel):
     email: str
     password: str | None = None
     about: str | None = None
-    avatar_ext: str | None = None
+    avatar: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -46,15 +42,10 @@ class GetAllUsersRequestModel(BaseModel):
     offset: int | None = None
 
 
-class ListResponse(GenericModel, Generic[T]):
-    items: list[T]
-    count: int
-
-
 class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
     username: str | None = None
     email: str
     about: str | None = None
-    avatar_ext: str | None = None
+    avatar: str | None = None
     current_user: bool | None = False
     model_config = ConfigDict(from_attributes=True)

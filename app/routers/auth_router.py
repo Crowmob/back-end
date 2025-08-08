@@ -1,7 +1,6 @@
 import logging
-import shutil
 
-from fastapi import APIRouter, Header, UploadFile, File, Form
+from fastapi import APIRouter, Header, UploadFile, File, Form, Body
 
 from app.services.auth_services.auth0 import auth0_user_services
 from app.utils.token import token_services
@@ -34,7 +33,7 @@ async def auth_user(
 
 
 @auth_router.post("/login")
-async def login(data: SignInRequestModel):
+async def login(data: SignInRequestModel = Body()):
     return await auth0_user_services.login_user(data.email, data.password)
 
 

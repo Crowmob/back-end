@@ -38,6 +38,7 @@ class Settings(BaseConfig):
     PORT: int
     RELOAD: bool
     REACT_URL: str
+    BASE_URL: str
     SECRET_KEY: str
     ALGORITHM: str
     EXP_TIME: int

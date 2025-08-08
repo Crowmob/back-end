@@ -1,6 +1,10 @@
 from pydantic import BaseModel
+from pydantic.generics import GenericModel
+from typing import TypeVar, Generic
 
 from app.schemas.user import UserDetailResponse
+
+T = TypeVar("T")
 
 
 class HealthCheckModel(BaseModel):
@@ -23,3 +27,8 @@ class AuthResponseModel(BaseModel):
 class MeResponseModel(BaseModel):
     status_code: int
     me: UserDetailResponse
+
+
+class ListResponse(GenericModel, Generic[T]):
+    items: list[T]
+    count: int

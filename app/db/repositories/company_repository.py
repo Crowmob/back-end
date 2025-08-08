@@ -3,7 +3,8 @@ from sqlalchemy.future import select
 from sqlalchemy import update, delete, func
 
 from app.models.company_model import Company
-from app.schemas.company import CompanyDetailResponse, ListResponse
+from app.schemas.company import CompanyDetailResponse
+from app.schemas.response_models import ListResponse
 
 
 class CompanyRepository:
@@ -17,6 +18,9 @@ class CompanyRepository:
             owner=owner, name=name, description=description, private=private
         )
         self.session.add(new_company)
+        await self.session.flush()
+        await self.session.refresh(new_company)
+        return new_company.id
 
     async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
         stmt = (
@@ -36,6 +40,7 @@ class CompanyRepository:
         items = [
             CompanyDetailResponse(
                 id=company.id,
+                owner=company.owner,
                 name=company.name,
                 description=company.description,
                 private=company.private,

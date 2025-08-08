@@ -1,6 +1,7 @@
 from app.services.user import user_services
 from app.utils.token import token_services
 from app.utils.password import password_services
+from app.core.exceptions.user_exceptions import UserWithEmailNotFoundException
 
 
 class BasicAuthServices:

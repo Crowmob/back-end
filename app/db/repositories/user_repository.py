@@ -3,7 +3,9 @@ from sqlalchemy.future import select
 from sqlalchemy import update, func
 
 from app.models.user_model import User, Identities
-from app.schemas.user import UserDetailResponse, ListResponse
+from app.schemas.user import UserDetailResponse
+from app.schemas.response_models import ListResponse
+from app.utils.settings_model import settings
 
 
 class UserRepository:
@@ -34,11 +36,13 @@ class UserRepository:
                 id=user.id,
                 username=user.username,
                 email=user.email,
-                avatar_ext=user.avatar_ext,
+                about=user.about,
+                avatar=f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                if user.avatar_ext
+                else None,
             )
             for user, _ in rows
         ]
-
         return ListResponse[UserDetailResponse](items=items, count=total_count)
 
     async def get_user_by_id(self, user_id: int):
@@ -46,7 +50,13 @@ class UserRepository:
         user = result.scalar_one_or_none()
         if not user:
             return None
-        return UserDetailResponse.model_validate(user)
+        user_dict = user.__dict__.copy()
+        if user_dict["avatar_ext"]:
+            user_dict["avatar"] = (
+                f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+            )
+        user_dict.pop("avatar_ext")
+        return UserDetailResponse.model_validate(user_dict)
 
     async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
         result = await self.session.execute(select(User).where(User.email == email))

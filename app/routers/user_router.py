@@ -1,19 +1,13 @@
-import os
-import shutil
-import glob
-
-from fastapi import APIRouter, Depends, Header, Response, Form, UploadFile, File
+from fastapi import APIRouter, Depends, Header, Form, UploadFile, File
 
 from app.services.user import user_services
 from app.utils.token import token_services
 from app.schemas.user import (
     GetAllUsersRequestModel,
     SignUpRequestModel,
-    UserUpdateRequestModel,
     UserDetailResponse,
-    ListResponse,
 )
-from app.schemas.response_models import ResponseModel
+from app.schemas.response_models import ResponseModel, ListResponse
 
 user_router = APIRouter(tags=["User CRUD"], prefix="/users")
 
@@ -55,9 +49,7 @@ async def update_user_endpoint(
     about: str = Form(...),
     avatar: UploadFile = File(None),
 ):
-    await user_services.update_user(
-        user_id, username, about=about, avatar_ext=avatar.filename.split(".")[-1]
-    )
+    await user_services.update_user(user_id, username, about=about, avatar=avatar)
     return ResponseModel(
         status_code=200, message=f"Successfully updated user with id: {user_id}!"
     )
