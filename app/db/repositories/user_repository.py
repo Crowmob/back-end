@@ -3,6 +3,7 @@ from sqlalchemy.future import select
 from sqlalchemy import update, func
 
 from app.models.user_model import User, Identities
+from app.models.membership_model import Memberships
 from app.schemas.user import UserDetailResponse
 from app.schemas.response_models import ListResponse
 from app.utils.settings_model import settings
@@ -110,3 +111,36 @@ class UserRepository:
             .where(User.id == user_id)
             .values(**{"about": None, "has_profile": False})
         )
+
+    async def get_users_in_company(
+        self, company_id: int, limit: int | None = None, offset: int | None = None
+    ):
+        stmt = (
+            select(User, func.count().over().label("total_count"))
+            .join(Memberships, User.id == Memberships.user_id)
+            .filter(Memberships.company_id == company_id)
+            .limit(limit or 5)
+            .offset(offset or 0)
+        )
+
+        result = await self.session.execute(stmt)
+        rows = result.all()
+
+        if not rows:
+            return ListResponse[UserDetailResponse](items=[], count=0)
+
+        total_count = rows[0][1]
+        items = [
+            UserDetailResponse(
+                id=user.id,
+                email=user.email,
+                username=user.username,
+                about=user.about,
+                avatar=f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                if user.avatar_ext
+                else None,
+            )
+            for user, _ in rows
+        ]
+
+        return ListResponse[UserDetailResponse](items=items, count=total_count)

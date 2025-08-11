@@ -30,7 +30,18 @@ class GetOwnerMembershipRequests(IDMixin, TimestampMixin, BaseModel):
     offset: int | None = None
 
 
-class GetMembershipsRequest(BaseModel):
+class GetCompaniesForUserRequest(BaseModel):
+    user_id: int
+    limit: int | None = None
+    offset: int | None = None
+
+
+class GetUsersInCompanyRequest(BaseModel):
     company_id: int
     limit: int | None = None
     offset: int | None = None
+
+
+class LeaveCompanyRequest(BaseModel):
+    company_id: int
+    user_id: int

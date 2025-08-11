@@ -83,11 +83,19 @@ async def test_delete_membership(
 
 
 @pytest.mark.asyncio
-async def test_get_all_memberships(membership_services_fixture, test_membership):
-    memberships = await membership_services_fixture.get_all_memberships(
+async def test_get_companies_for_user(membership_services_fixture, test_membership):
+    companies = await membership_services_fixture.get_companies_for_user(
+        user_id=test_membership["user_id"], limit=5, offset=0
+    )
+    assert len(companies.items) >= 1
+
+
+@pytest.mark.asyncio
+async def test_get_users_in_company(membership_services_fixture, test_membership):
+    users = await membership_services_fixture.get_users_in_company(
         company_id=test_membership["company_id"], limit=5, offset=0
     )
-    assert len(memberships.items) >= 1
+    assert len(users.items) >= 1
 
 
 @pytest.mark.asyncio

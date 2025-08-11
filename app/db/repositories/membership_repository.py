@@ -3,10 +3,12 @@ from sqlalchemy import delete, select, and_, func
 
 from app.models.membership_model import MembershipRequests, Memberships
 from app.models.company_model import Company
+from app.models.user_model import User
 from app.schemas.membership import (
     MembershipRequestDetailResponse,
-    MembershipDetailResponse,
 )
+from app.schemas.user import UserDetailResponse
+from app.schemas.company import CompanyDetailResponse
 from app.schemas.response_models import ListResponse
 
 
@@ -141,28 +143,3 @@ class MembershipRepository:
         return ListResponse[MembershipRequestDetailResponse](
             items=items, count=total_count
         )
-
-    async def get_all_memberships(
-        self, company_id: int, limit: int | None = None, offset: int | None = None
-    ):
-        stmt = (
-            select(Memberships, func.count().over().label("total_count"))
-            .where(Memberships.company_id == company_id)
-            .offset(offset or 0)
-            .limit(limit or 5)
-        )
-
-        result = await self.session.execute(stmt)
-        rows = result.all()
-
-        if not rows:
-            return ListResponse[MembershipDetailResponse](items=[], count=0)
-
-        total_count = rows[0][1]
-        items = [
-            MembershipDetailResponse(
-                id=request.id, user_id=request.user_id, company_id=request.company_id
-            )
-            for request, _ in rows
-        ]
-        return ListResponse[MembershipDetailResponse](items=items, count=total_count)

@@ -74,20 +74,6 @@ class MembershipServices:
                 raise
 
     @staticmethod
-    async def get_all_memberships(
-        company_id: int, limit: int | None = None, offset: int | None = None
-    ):
-        async with UnitOfWork() as uow:
-            try:
-                memberships = await uow.memberships.get_all_memberships(
-                    company_id, limit, offset
-                )
-                return memberships
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise
-
-    @staticmethod
     async def get_membership_requests_for_user(
         request_type: str,
         user_id: int,
@@ -121,6 +107,32 @@ class MembershipServices:
                     )
                 )
                 return membership_requests
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def get_companies_for_user(
+        user_id: int, limit: int | None = None, offset: int | None = None
+    ):
+        async with UnitOfWork() as uow:
+            try:
+                companies = await uow.companies.get_companies_for_user(
+                    user_id, limit, offset
+                )
+                return companies
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def get_users_in_company(
+        company_id: int, limit: int | None = None, offset: int | None = None
+    ):
+        async with UnitOfWork() as uow:
+            try:
+                users = await uow.users.get_users_in_company(company_id, limit, offset)
+                return users
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise

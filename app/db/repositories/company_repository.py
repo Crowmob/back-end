@@ -3,6 +3,7 @@ from sqlalchemy.future import select
 from sqlalchemy import update, delete, func
 
 from app.models.company_model import Company
+from app.models.membership_model import Memberships
 from app.schemas.company import CompanyDetailResponse
 from app.schemas.response_models import ListResponse
 
@@ -66,3 +67,34 @@ class CompanyRepository:
 
     async def delete_company(self, company_id: int):
         await self.session.execute(delete(Company).where(Company.id == company_id))
+
+    async def get_companies_for_user(
+        self, user_id: int, limit: int | None = None, offset: int | None = None
+    ):
+        stmt = (
+            select(Company, func.count().over().label("total_count"))
+            .join(Memberships, Company.id == Memberships.company_id)
+            .filter(Memberships.user_id == user_id)
+            .limit(limit or 5)
+            .offset(offset or 0)
+        )
+
+        result = await self.session.execute(stmt)
+        rows = result.all()
+
+        if not rows:
+            return ListResponse[CompanyDetailResponse](items=[], count=0)
+
+        total_count = rows[0][1]
+        items = [
+            CompanyDetailResponse(
+                id=company.id,
+                owner=user_id,
+                name=company.name,
+                description=company.description,
+                private=company.private,
+            )
+            for company, _ in rows
+        ]
+
+        return ListResponse[CompanyDetailResponse](items=items, count=total_count)
