@@ -12,24 +12,7 @@ class CompanyRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_company(
-        self, owner: int, name: str, description: str, private: bool = False
-    ):
-        new_company = Company(
-            owner=owner, name=name, description=description, private=private
-        )
-        self.session.add(new_company)
-        await self.session.flush()
-        await self.session.refresh(new_company)
-        return new_company.id
-
-    async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
-        stmt = (
-            select(Company, func.count().over().label("total_count"))
-            .offset(offset)
-            .limit(limit)
-        )
-
+    async def return_companies(self, stmt):
         result = await self.session.execute(stmt)
         rows = result.all()
 
@@ -50,6 +33,26 @@ class CompanyRepository:
         ]
 
         return ListResponse[CompanyDetailResponse](items=items, count=total_count)
+
+    async def create_company(
+        self, owner: int, name: str, description: str, private: bool = False
+    ):
+        new_company = Company(
+            owner=owner, name=name, description=description, private=private
+        )
+        self.session.add(new_company)
+        await self.session.flush()
+        await self.session.refresh(new_company)
+        return new_company.id
+
+    async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
+        stmt = (
+            select(Company, func.count().over().label("total_count"))
+            .offset(offset)
+            .limit(limit)
+        )
+
+        return await self.return_companies(stmt)
 
     async def get_company_by_id(self, company_id: int):
         result = await self.session.execute(
@@ -79,22 +82,4 @@ class CompanyRepository:
             .offset(offset or 0)
         )
 
-        result = await self.session.execute(stmt)
-        rows = result.all()
-
-        if not rows:
-            return ListResponse[CompanyDetailResponse](items=[], count=0)
-
-        total_count = rows[0][1]
-        items = [
-            CompanyDetailResponse(
-                id=company.id,
-                owner=user_id,
-                name=company.name,
-                description=company.description,
-                private=company.private,
-            )
-            for company, _ in rows
-        ]
-
-        return ListResponse[CompanyDetailResponse](items=items, count=total_count)
+        return await self.return_companies(stmt)

@@ -7,6 +7,7 @@ from app.schemas.membership import (
     LeaveCompanyRequest,
     GetCompaniesForUserRequest,
     GetUsersInCompanyRequest,
+    GetAllAdminsRequest,
 )
 from app.schemas.company import CompanyDetailResponse
 from app.schemas.user import UserDetailResponse
@@ -44,6 +45,13 @@ async def get_companies_for_user(data: GetCompaniesForUserRequest = Depends()):
 @membership_router.get("/company", response_model=ListResponse[UserDetailResponse])
 async def get_users_in_company(data: GetUsersInCompanyRequest = Depends()):
     return await membership_services.get_users_in_company(
+        data.company_id, data.limit, data.offset
+    )
+
+
+@membership_router.get("/admins", response_model=ListResponse[UserDetailResponse])
+async def get_all_admins(data: GetAllAdminsRequest = Depends()):
+    return await membership_services.get_all_admins(
         data.company_id, data.limit, data.offset
     )
 

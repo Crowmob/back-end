@@ -23,7 +23,9 @@ class CompanyServices:
             company_id = await uow.companies.create_company(
                 owner=owner, name=name, description=description, private=private
             )
-            await uow.memberships.create_membership(owner, company_id)
+            await uow.memberships.create_membership(
+                role="owner", user_id=owner, company_id=company_id
+            )
             logger.info(f"Company created: {name}")
             return company_id
 

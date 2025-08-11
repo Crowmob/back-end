@@ -1,7 +1,7 @@
 """initial
 
 Revision ID: f7a6b74765b5
-Revises:
+Revises: 3824759e28f0
 Create Date: 2025-08-01 10:53:25.545766
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 revision: str = "f7a6b74765b5"
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = "3824759e28f0"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

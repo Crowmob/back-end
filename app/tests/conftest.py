@@ -11,6 +11,7 @@ from app.db.unit_of_work import UnitOfWork
 from app.utils.settings_model import settings
 from app.models.user_model import User
 from app.models.membership_model import Memberships, MembershipRequests
+from app.services.admin import admin_services
 from app.services.membership import membership_services
 from app.utils.db import (
     truncate_users_table,
@@ -62,6 +63,15 @@ def membership_services_fixture(db_session, monkeypatch):
     return membership_services
 
 
+@pytest.fixture
+def admin_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr("app.services.admin.UnitOfWork", unit_of_work_with_session)
+    return admin_services
+
+
 @pytest_asyncio.fixture
 async def test_user(db_session):
     result = await db_session.execute(
@@ -107,6 +117,18 @@ async def test_membership(db_session, test_user, test_company):
     result = await db_session.execute(
         insert(Memberships)
         .values(user_id=test_user["id"], company_id=test_company)
+        .returning(Memberships.id)
+    )
+    membership_id = result.one()[0]
+    await db_session.commit()
+    return {"id": membership_id, "user_id": test_user["id"], "company_id": test_company}
+
+
+@pytest_asyncio.fixture
+async def test_admin(db_session, test_user, test_company):
+    result = await db_session.execute(
+        insert(Memberships)
+        .values(role="admin", user_id=test_user["id"], company_id=test_company)
         .returning(Memberships.id)
     )
     membership_id = result.one()[0]

@@ -1,7 +1,7 @@
 """added memberships
 
 Revision ID: f200bf145e3f
-Revises: 27619efea0a4
+Revises: f7a6b74765b5
 Create Date: 2025-08-08 15:27:29.591160
 
 """
@@ -11,10 +11,8 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-
-# revision identifiers, used by Alembic.
 revision: str = "f200bf145e3f"
-down_revision: Union[str, Sequence[str], None] = "27619efea0a4"
+down_revision: Union[str, Sequence[str], None] = "f7a6b74765b5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

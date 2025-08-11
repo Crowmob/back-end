@@ -1,14 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import delete, select, and_, func
+from sqlalchemy import delete, select, and_, func, update
 
 from app.models.membership_model import MembershipRequests, Memberships
 from app.models.company_model import Company
-from app.models.user_model import User
 from app.schemas.membership import (
     MembershipRequestDetailResponse,
 )
-from app.schemas.user import UserDetailResponse
-from app.schemas.company import CompanyDetailResponse
 from app.schemas.response_models import ListResponse
 
 
@@ -142,4 +139,26 @@ class MembershipRepository:
 
         return ListResponse[MembershipRequestDetailResponse](
             items=items, count=total_count
+        )
+
+    async def appoint_admin(self, user_id: int, company_id: int):
+        await self.session.execute(
+            update(Memberships)
+            .values(role="admin")
+            .where(
+                and_(
+                    Memberships.user_id == user_id, Memberships.company_id == company_id
+                )
+            )
+        )
+
+    async def remove_admin(self, user_id: int, company_id: int):
+        await self.session.execute(
+            update(Memberships)
+            .values(role="member")
+            .where(
+                and_(
+                    Memberships.user_id == user_id, Memberships.company_id == company_id
+                )
+            )
         )

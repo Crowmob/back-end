@@ -42,6 +42,12 @@ class GetUsersInCompanyRequest(BaseModel):
     offset: int | None = None
 
 
+class GetAllAdminsRequest(BaseModel):
+    company_id: int
+    limit: int | None = None
+    offset: int | None = None
+
+
 class LeaveCompanyRequest(BaseModel):
     company_id: int
     user_id: int
