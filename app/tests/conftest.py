@@ -1,14 +1,17 @@
 import pytest
 import pytest_asyncio
+from numba.scripts.generate_lower_listing import description
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import insert
 
+from app.models.company_model import Company
 from app.services.user import user_services
+from app.services.company import company_services
 from app.db.unit_of_work import UnitOfWork
 from app.utils.settings_model import settings
 from app.models.user_model import User
-from app.utils.db import truncate_users_table
+from app.utils.db import truncate_users_table, truncate_companies_table
 
 
 @pytest_asyncio.fixture
@@ -19,6 +22,7 @@ async def db_session():
     )
     async with test_session_maker() as session:
         await truncate_users_table(session)
+        await truncate_companies_table(session)
         yield session
         await session.rollback()
 
@@ -51,3 +55,15 @@ async def test_user(db_session):
     user_id, email = result.one()
     await db_session.commit()
     return {"id": user_id, "email": email}
+
+
+@pytest_asyncio.fixture
+async def test_company(db_session, test_user):
+    result = await db_session.execute(
+        insert(Company)
+        .values(owner=test_user["id"], name="test", description="test", private=True)
+        .returning(Company.id)
+    )
+    company_id = result.one()[0]
+    await db_session.commit()
+    return company_id

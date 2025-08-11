@@ -4,7 +4,7 @@ import glob
 import aiofiles
 
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from fastapi import UploadFile, File
+from fastapi import UploadFile
 
 from app.db.unit_of_work import UnitOfWork
 from app.utils.password import password_services

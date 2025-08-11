@@ -1,6 +1,7 @@
 from app.services.user import user_services
 from app.utils.token import token_services
 from app.utils.password import password_services
+from app.core.exceptions.user_exceptions import UserWithEmailNotFoundException
 
 
 class BasicAuthServices:
@@ -18,9 +19,8 @@ class BasicAuthServices:
             return token
 
     @staticmethod
-    async def get_me(token: str):
-        data = token_services.decode_token(token)
-        user = await user_services.get_user_by_id(data["id"])
+    async def get_me(email: str):
+        user = await user_services.get_user_by_email(email)
         return user
 
 

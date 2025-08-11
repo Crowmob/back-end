@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.postgres_init import async_session_maker
 from app.db.repositories.user_repository import UserRepository
+from app.db.repositories.company_repository import CompanyRepository
 
 
 class UnitOfWork:
@@ -9,6 +10,7 @@ class UnitOfWork:
         self._external_session = session
         self.session = None
         self.users = None
+        self.companies = None
 
     async def __aenter__(self):
         if self._external_session:
@@ -18,6 +20,7 @@ class UnitOfWork:
             self.session = await self._session_context.__aenter__()
 
         self.users = UserRepository(self.session)
+        self.companies = CompanyRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
