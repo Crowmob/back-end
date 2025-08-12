@@ -24,10 +24,22 @@ class MembershipRepository:
         await self.session.refresh(membership_request)
         return membership_request.id
 
-    async def get_membership_request_by_id(self, request_id: int):
-        result = await self.session.execute(
-            select(MembershipRequests).where(MembershipRequests.id == request_id)
-        )
+    async def get_membership_request(
+        self, request_type: str, company_id: int, user_id: int
+    ):
+        if request_type == "invite":
+            condition = and_(
+                MembershipRequests.type == request_type,
+                MembershipRequests.from_id == company_id,
+                MembershipRequests.to_id == user_id,
+            )
+        else:
+            condition = and_(
+                MembershipRequests.type == request_type,
+                MembershipRequests.from_id == user_id,
+                MembershipRequests.to_id == company_id,
+            )
+        result = await self.session.execute(select(MembershipRequests).where(condition))
         membership_request = result.scalar_one_or_none()
         if not membership_request:
             return None
@@ -38,8 +50,8 @@ class MembershipRepository:
             delete(MembershipRequests).where(MembershipRequests.id == request_id)
         )
 
-    async def create_membership(self, user_id: int, company_id: int):
-        membership = Memberships(user_id=user_id, company_id=company_id)
+    async def create_membership(self, role: str, user_id: int, company_id: int):
+        membership = Memberships(role=role, user_id=user_id, company_id=company_id)
         self.session.add(membership)
         await self.session.flush()
         await self.session.refresh(membership)
@@ -98,27 +110,26 @@ class MembershipRepository:
             items=items, count=total_count
         )
 
-    async def get_membership_requests_for_owner(
+    async def get_membership_requests_to_company(
         self,
-        owner_id: int,
         request_type: str,
+        company_id: int,
         limit: int | None = None,
         offset: int | None = None,
     ):
+        if request_type == "request":
+            join_condition = and_(
+                MembershipRequests.to_id == Company.id, Company.id == company_id
+            )
+        else:
+            join_condition = and_(
+                MembershipRequests.from_id == Company.id, Company.id == company_id
+            )
+
         stmt = (
             select(MembershipRequests, func.count().over().label("total_count"))
-            .join(
-                Company,
-                Company.id
-                == (
-                    MembershipRequests.to_id
-                    if request_type == "request"
-                    else MembershipRequests.from_id
-                ),
-            )
-            .where(
-                and_(Company.owner == owner_id, MembershipRequests.type == request_type)
-            )
+            .join(Company, join_condition)
+            .where(MembershipRequests.type == request_type)
             .offset(offset or 0)
             .limit(limit or 5)
         )

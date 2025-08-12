@@ -4,7 +4,7 @@ from sqlalchemy import update, func, and_
 
 from app.models.user_model import User, Identities
 from app.models.membership_model import Memberships
-from app.schemas.user import UserDetailResponse
+from app.schemas.user import UserDetailResponse, MemberDetailResponse
 from app.schemas.response_models import ListResponse
 from app.utils.settings_model import settings
 
@@ -13,7 +13,41 @@ class UserRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def return_users(self, stmt):
+    async def return_members(self, stmt):
+        result = await self.session.execute(stmt)
+        rows = result.all()
+
+        if not rows:
+            return ListResponse[UserDetailResponse](items=[], count=0)
+
+        total_count = rows[0][2]
+        items = [
+            MemberDetailResponse(
+                id=user.id,
+                username=user.username,
+                email=user.email,
+                about=user.about,
+                role=role,
+                avatar=f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                if user.avatar_ext
+                else None,
+            )
+            for user, role, _ in rows
+        ]
+        return ListResponse[MemberDetailResponse](items=items, count=total_count)
+
+    async def get_all_users(
+        self,
+        limit: int | None = None,
+        offset: int | None = None,
+    ):
+        stmt = (
+            select(User, func.count().over().label("total_count"))
+            .where(User.has_profile)
+            .offset(offset or 0)
+            .limit(limit or 10)
+        )
+
         result = await self.session.execute(stmt)
         rows = result.all()
 
@@ -34,20 +68,6 @@ class UserRepository:
             for user, _ in rows
         ]
         return ListResponse[UserDetailResponse](items=items, count=total_count)
-
-    async def get_all_users(
-        self,
-        limit: int | None = None,
-        offset: int | None = None,
-    ):
-        stmt = (
-            select(User, func.count().over().label("total_count"))
-            .where(User.has_profile)
-            .offset(offset or 0)
-            .limit(limit or 10)
-        )
-
-        return await self.return_users(stmt)
 
     async def get_user_by_id(self, user_id: int):
         result = await self.session.execute(select(User).where(User.id == user_id))
@@ -119,20 +139,20 @@ class UserRepository:
         self, company_id: int, limit: int | None = None, offset: int | None = None
     ):
         stmt = (
-            select(User, func.count().over().label("total_count"))
+            select(User, Memberships.role, func.count().over().label("total_count"))
             .join(Memberships, User.id == Memberships.user_id)
             .filter(Memberships.company_id == company_id)
             .limit(limit or 5)
             .offset(offset or 0)
         )
 
-        return await self.return_users(stmt)
+        return await self.return_members(stmt)
 
     async def get_all_admins(
         self, company_id: int, limit: int | None = None, offset: int | None = None
     ):
         stmt = (
-            select(User, func.count().over().label("total_count"))
+            select(User, Memberships.role, func.count().over().label("total_count"))
             .join(
                 Memberships,
                 and_(User.id == Memberships.user_id, Memberships.role == "admin"),
@@ -142,4 +162,4 @@ class UserRepository:
             .offset(offset or 0)
         )
 
-        return await self.return_users(stmt)
+        return await self.return_members(stmt)

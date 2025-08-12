@@ -12,7 +12,24 @@ class CompanyRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def return_companies(self, stmt):
+    async def create_company(
+        self, owner: int, name: str, description: str, private: bool = False
+    ):
+        new_company = Company(
+            owner=owner, name=name, description=description, private=private
+        )
+        self.session.add(new_company)
+        await self.session.flush()
+        await self.session.refresh(new_company)
+        return new_company.id
+
+    async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
+        stmt = (
+            select(Company, func.count().over().label("total_count"))
+            .offset(offset)
+            .limit(limit)
+        )
+
         result = await self.session.execute(stmt)
         rows = result.all()
 
@@ -33,26 +50,6 @@ class CompanyRepository:
         ]
 
         return ListResponse[CompanyDetailResponse](items=items, count=total_count)
-
-    async def create_company(
-        self, owner: int, name: str, description: str, private: bool = False
-    ):
-        new_company = Company(
-            owner=owner, name=name, description=description, private=private
-        )
-        self.session.add(new_company)
-        await self.session.flush()
-        await self.session.refresh(new_company)
-        return new_company.id
-
-    async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
-        stmt = (
-            select(Company, func.count().over().label("total_count"))
-            .offset(offset)
-            .limit(limit)
-        )
-
-        return await self.return_companies(stmt)
 
     async def get_company_by_id(self, company_id: int):
         result = await self.session.execute(
@@ -75,11 +72,31 @@ class CompanyRepository:
         self, user_id: int, limit: int | None = None, offset: int | None = None
     ):
         stmt = (
-            select(Company, func.count().over().label("total_count"))
+            select(Company, Memberships.role, func.count().over().label("total_count"))
             .join(Memberships, Company.id == Memberships.company_id)
             .filter(Memberships.user_id == user_id)
             .limit(limit or 5)
             .offset(offset or 0)
         )
 
-        return await self.return_companies(stmt)
+        result = await self.session.execute(stmt)
+        rows = result.all()
+
+        if not rows:
+            return ListResponse[CompanyDetailResponse](items=[], count=0)
+
+        total_count = rows[0][2]
+
+        items = [
+            CompanyDetailResponse(
+                id=company.id,
+                owner=company.owner,
+                name=company.name,
+                description=company.description,
+                private=company.private,
+                user_role=role,
+            )
+            for company, role, _ in rows
+        ]
+
+        return ListResponse[CompanyDetailResponse](items=items, count=total_count)

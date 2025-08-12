@@ -22,6 +22,7 @@ class CompanyDetailResponse(IDMixin, BaseModel):
     description: str | None = None
     private: bool | None = False
     is_owner: bool | None = False
+    user_role: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

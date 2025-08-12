@@ -49,3 +49,13 @@ class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
     avatar: str | None = None
     current_user: bool | None = False
     model_config = ConfigDict(from_attributes=True)
+
+
+class MemberDetailResponse(IDMixin, TimestampMixin, BaseModel):
+    username: str | None = None
+    email: str
+    about: str | None = None
+    avatar: str | None = None
+    role: str | None = None
+    current_user: bool | None = False
+    model_config = ConfigDict(from_attributes=True)
