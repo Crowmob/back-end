@@ -13,6 +13,7 @@ class Memberships(Base, IDMixin, TimestampMixin):
     company_id: Mapped[int] = mapped_column(
         ForeignKey("companies.id", ondelete="CASCADE"), nullable=False
     )
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")
 
 
 class MembershipRequests(Base, IDMixin, TimestampMixin):

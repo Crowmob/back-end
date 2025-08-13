@@ -3,6 +3,19 @@ from pydantic import BaseModel, ConfigDict
 from app.schemas.base import IDMixin, TimestampMixin
 
 
+class MembershipRequestSchema(BaseModel):
+    type: str
+    from_id: int
+    to_id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MembershipSchema(BaseModel):
+    role: str
+    user_id: int
+    company_id: int
+
+
 class MembershipRequestDetailResponse(IDMixin, TimestampMixin, BaseModel):
     type: str
     from_id: int

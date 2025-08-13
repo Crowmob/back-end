@@ -4,14 +4,15 @@ from sqlalchemy import update, func
 
 from app.models.user_model import User, Identities
 from app.models.membership_model import Memberships
-from app.schemas.user import UserDetailResponse
+from app.schemas.user import UserDetailResponse, UserSchema, UserUpdateRequestModel
 from app.schemas.response_models import ListResponse
 from app.utils.settings_model import settings
+from app.db.repositories.base_repository import BaseRepository
 
 
-class UserRepository:
+class UserRepository(BaseRepository[User, UserSchema, UserUpdateRequestModel]):
     def __init__(self, session: AsyncSession):
-        self.session = session
+        super().__init__(session, User)
 
     async def get_all_users(
         self,
@@ -46,40 +47,12 @@ class UserRepository:
         ]
         return ListResponse[UserDetailResponse](items=items, count=total_count)
 
-    async def get_user_by_id(self, user_id: int):
-        result = await self.session.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
-        if not user:
-            return None
-        user_dict = user.__dict__.copy()
-        if user_dict["avatar_ext"]:
-            user_dict["avatar"] = (
-                f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
-            )
-        user_dict.pop("avatar_ext")
-        return UserDetailResponse.model_validate(user_dict)
-
     async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
         result = await self.session.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if user:
             return UserDetailResponse.model_validate(user)
         return None
-
-    async def create_user(
-        self,
-        username: str | None,
-        email: str,
-        password: str | None,
-        avatar_ext: str | None = None,
-    ) -> int:
-        new_user = User(
-            username=username, email=email, password=password, avatar_ext=avatar_ext
-        )
-        self.session.add(new_user)
-        await self.session.flush()
-        await self.session.refresh(new_user)
-        return new_user.id
 
     async def create_identity(
         self,
@@ -99,11 +72,6 @@ class UserRepository:
         result = await self.session.execute(query)
         identity = result.scalar_one_or_none()
         return identity is not None
-
-    async def update_user(self, user_id: int, values_to_update) -> None:
-        await self.session.execute(
-            update(User).where(User.id == user_id).values(**values_to_update)
-        )
 
     async def delete_user(self, user_id: int) -> None:
         await self.session.execute(

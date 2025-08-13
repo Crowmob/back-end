@@ -5,6 +5,11 @@ from app.db.unit_of_work import UnitOfWork
 from app.core.exceptions.membership_exceptions import (
     MembershipRequestWithIdNotFoundException,
 )
+from app.schemas.membership import (
+    MembershipRequestDetailResponse,
+    MembershipRequestSchema,
+    MembershipSchema,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -15,12 +20,16 @@ class MembershipServices:
         async with UnitOfWork() as uow:
             try:
                 if request_type == "invitation":
-                    membership_id = await uow.memberships.create_membership_request(
-                        request_type, user_id, company_id
+                    membership_id = await uow.membership_requests.create(
+                        MembershipRequestSchema(
+                            type=request_type, to_id=company_id, from_id=user_id
+                        )
                     )
                 elif request_type == "request":
-                    membership_id = await uow.memberships.create_membership_request(
-                        request_type, company_id, user_id
+                    membership_id = await uow.membership_requests.create(
+                        MembershipRequestSchema(
+                            type=request_type, to_id=company_id, from_id=user_id
+                        )
                     )
                 logger.info("Created membership request")
                 return membership_id
@@ -32,7 +41,7 @@ class MembershipServices:
     async def cancel_membership_request(request_id: int):
         async with UnitOfWork() as uow:
             try:
-                await uow.memberships.delete_membership_request(request_id)
+                await uow.membership_requests.delete(request_id)
                 logger.info(f"Deleted membership request with ID {request_id}")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
@@ -42,19 +51,24 @@ class MembershipServices:
     async def accept_membership_request(request_id: int):
         async with UnitOfWork() as uow:
             try:
-                membership_request = await uow.memberships.get_membership_request_by_id(
-                    request_id
-                )
+                membership_request = await uow.membership_requests.get_by_id(request_id)
                 if membership_request is None:
                     raise MembershipRequestWithIdNotFoundException(request_id)
-                await uow.memberships.delete_membership_request(request_id)
+                await uow.membership_requests.delete(request_id)
                 if membership_request.type == "request":
-                    membership_id = await uow.memberships.create_membership(
-                        membership_request.from_id, membership_request.to_id
+                    membership_id = await uow.memberships.create(
+                        MembershipSchema(
+                            role="member",
+                            user_id=membership_request.from_id,
+                            company_id=membership_request.to_id,
+                        )
                     )
                 elif membership_request.type == "invitation":
                     membership_id = await uow.memberships.create_membership(
-                        membership_request.to_id, membership_request.from_id
+                        MembershipSchema(
+                            user_id=membership_request.from_id,
+                            company_id=membership_request.to_id,
+                        )
                     )
                 logger.info("Created membership successfully")
                 return membership_id
@@ -83,7 +97,7 @@ class MembershipServices:
         async with UnitOfWork() as uow:
             try:
                 membership_requests = (
-                    await uow.memberships.get_membership_requests_for_user(
+                    await uow.membership_requests.get_membership_requests_for_user(
                         request_type, user_id, limit, offset
                     )
                 )
@@ -102,7 +116,7 @@ class MembershipServices:
         async with UnitOfWork() as uow:
             try:
                 membership_requests = (
-                    await uow.memberships.get_membership_requests_for_owner(
+                    await uow.membership_requests.get_membership_requests_for_owner(
                         user_id, request_type, limit, offset
                     )
                 )
