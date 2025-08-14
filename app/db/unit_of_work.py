@@ -1,8 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.postgres_init import async_session_maker
+from app.db.repositories.membership_requests_repository import (
+    MembershipRequestsRepository,
+)
 from app.db.repositories.user_repository import UserRepository
 from app.db.repositories.company_repository import CompanyRepository
+from app.db.repositories.membership_repository import MembershipRepository
 
 
 class UnitOfWork:
@@ -11,6 +15,8 @@ class UnitOfWork:
         self.session = None
         self.users = None
         self.companies = None
+        self.memberships = None
+        self.membership_requests = None
 
     async def __aenter__(self):
         if self._external_session:
@@ -21,6 +27,8 @@ class UnitOfWork:
 
         self.users = UserRepository(self.session)
         self.companies = CompanyRepository(self.session)
+        self.memberships = MembershipRepository(self.session)
+        self.membership_requests = MembershipRequestsRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

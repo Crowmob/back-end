@@ -1,0 +1,155 @@
+import logging
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.db.unit_of_work import UnitOfWork
+from app.core.exceptions.membership_exceptions import (
+    MembershipRequestWithIdNotFoundException,
+)
+from app.schemas.membership import (
+    MembershipRequestDetailResponse,
+    MembershipRequestSchema,
+    MembershipSchema,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class MembershipServices:
+    @staticmethod
+    async def send_membership_request(request_type: str, company_id: int, user_id: int):
+        async with UnitOfWork() as uow:
+            try:
+                if request_type == "invitation":
+                    membership_id = await uow.membership_requests.create(
+                        MembershipRequestSchema(
+                            type=request_type, to_id=company_id, from_id=user_id
+                        )
+                    )
+                elif request_type == "request":
+                    membership_id = await uow.membership_requests.create(
+                        MembershipRequestSchema(
+                            type=request_type, to_id=company_id, from_id=user_id
+                        )
+                    )
+                logger.info("Created membership request")
+                return membership_id
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def cancel_membership_request(request_id: int):
+        async with UnitOfWork() as uow:
+            try:
+                await uow.membership_requests.delete(request_id)
+                logger.info(f"Deleted membership request with ID {request_id}")
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def accept_membership_request(request_id: int):
+        async with UnitOfWork() as uow:
+            try:
+                membership_request = await uow.membership_requests.get_by_id(request_id)
+                if membership_request is None:
+                    raise MembershipRequestWithIdNotFoundException(request_id)
+                await uow.membership_requests.delete(request_id)
+                if membership_request.type == "request":
+                    membership_id = await uow.memberships.create(
+                        MembershipSchema(
+                            role="member",
+                            user_id=membership_request.from_id,
+                            company_id=membership_request.to_id,
+                        )
+                    )
+                elif membership_request.type == "invitation":
+                    membership_id = await uow.memberships.create_membership(
+                        MembershipSchema(
+                            user_id=membership_request.from_id,
+                            company_id=membership_request.to_id,
+                        )
+                    )
+                logger.info("Created membership successfully")
+                return membership_id
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def delete_membership(user_id: int, company_id: int):
+        async with UnitOfWork() as uow:
+            try:
+                await uow.memberships.delete_membership(
+                    user_id=user_id, company_id=company_id
+                )
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def get_membership_requests_for_user(
+        request_type: str,
+        user_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
+    ):
+        async with UnitOfWork() as uow:
+            try:
+                membership_requests = (
+                    await uow.membership_requests.get_membership_requests_for_user(
+                        request_type, user_id, limit, offset
+                    )
+                )
+                return membership_requests
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def get_membership_requests_for_owner(
+        request_type: str,
+        user_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
+    ):
+        async with UnitOfWork() as uow:
+            try:
+                membership_requests = (
+                    await uow.membership_requests.get_membership_requests_for_owner(
+                        user_id, request_type, limit, offset
+                    )
+                )
+                return membership_requests
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def get_companies_for_user(
+        user_id: int, limit: int | None = None, offset: int | None = None
+    ):
+        async with UnitOfWork() as uow:
+            try:
+                companies = await uow.companies.get_companies_for_user(
+                    user_id, limit, offset
+                )
+                return companies
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+    @staticmethod
+    async def get_users_in_company(
+        company_id: int, limit: int | None = None, offset: int | None = None
+    ):
+        async with UnitOfWork() as uow:
+            try:
+                users = await uow.users.get_users_in_company(company_id, limit, offset)
+                return users
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise
+
+
+membership_services = MembershipServices()

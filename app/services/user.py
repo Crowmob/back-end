@@ -14,6 +14,8 @@ from app.core.exceptions.user_exceptions import (
     UserWithEmailNotFoundException,
     UserUpdateException,
 )
+from app.utils.settings_model import settings
+from app.schemas.user import UserDetailResponse, UserUpdateRequestModel, UserSchema
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +33,14 @@ class UserServices:
         async with UnitOfWork() as uow:
             if password:
                 password = password_services.hash_password(password)
-
             try:
-                user_id = await uow.users.create_user(
-                    username=username,
-                    email=email,
-                    password=password,
-                    avatar_ext=avatar_ext,
+                user_id = await uow.users.create(
+                    UserSchema(
+                        username=username,
+                        email=email,
+                        password=password,
+                        avatar_ext=avatar_ext,
+                    )
                 )
                 logger.info(f"User created: {username}")
 
@@ -83,12 +86,18 @@ class UserServices:
     @staticmethod
     async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
         try:
-            user = await uow.users.get_user_by_id(user_id)
+            user = await uow.users.get_by_id(user_id)
             if not user:
                 logger.warning(f"No user found with id={user_id}")
                 raise UserWithIdNotFoundException(user_id)
+            user_dict = user.__dict__.copy()
+            if user_dict["avatar_ext"]:
+                user_dict["avatar"] = (
+                    f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                )
+            user_dict.pop("avatar_ext")
             logger.info(f"Fetched user with id={user_id}")
-            return user
+            return UserDetailResponse.model_validate(user_dict)
 
         except SQLAlchemyError as e:
             logger.info(f"SQLAlchemy error: {e}")
@@ -135,22 +144,15 @@ class UserServices:
                 async with aiofiles.open(filepath, "wb") as out_file:
                     while content := await avatar.read(1024):
                         await out_file.write(content)
-            else:
-                ext = None
             if password:
                 password = password_services.hash_password(password)
-            values_to_update = {
-                "username": username,
-                "password": password,
-                "about": about,
-                "avatar_ext": ext,
-            }
-            for key in list(values_to_update.keys()):
-                if values_to_update[key] is None:
-                    values_to_update.pop(key)
-            logger.info(values_to_update)
             try:
-                await uow.users.update_user(user_id, values_to_update)
+                await uow.users.update(
+                    user_id,
+                    UserUpdateRequestModel(
+                        username=username, password=password, about=about
+                    ),
+                )
 
                 logger.info(f"User updated: id={user_id}")
 

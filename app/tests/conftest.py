@@ -1,6 +1,5 @@
 import pytest
 import pytest_asyncio
-from numba.scripts.generate_lower_listing import description
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import insert
@@ -11,7 +10,14 @@ from app.services.company import company_services
 from app.db.unit_of_work import UnitOfWork
 from app.utils.settings_model import settings
 from app.models.user_model import User
-from app.utils.db import truncate_users_table, truncate_companies_table
+from app.models.membership_model import Memberships, MembershipRequests
+from app.services.membership import membership_services
+from app.utils.db import (
+    truncate_users_table,
+    truncate_companies_table,
+    truncate_memberships_table,
+    truncate_membership_requests_table,
+)
 
 
 @pytest_asyncio.fixture
@@ -23,6 +29,8 @@ async def db_session():
     async with test_session_maker() as session:
         await truncate_users_table(session)
         await truncate_companies_table(session)
+        await truncate_memberships_table(session)
+        await truncate_membership_requests_table(session)
         yield session
         await session.rollback()
 
@@ -43,6 +51,15 @@ def company_services_fixture(db_session, monkeypatch):
 
     monkeypatch.setattr("app.services.company.UnitOfWork", unit_of_work_with_session)
     return company_services
+
+
+@pytest.fixture
+def membership_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr("app.services.membership.UnitOfWork", unit_of_work_with_session)
+    return membership_services
 
 
 @pytest_asyncio.fixture
@@ -67,3 +84,31 @@ async def test_company(db_session, test_user):
     company_id = result.one()[0]
     await db_session.commit()
     return company_id
+
+
+@pytest_asyncio.fixture
+async def test_membership_request(db_session, test_user, test_company):
+    result = await db_session.execute(
+        insert(MembershipRequests)
+        .values(type="request", from_id=test_user["id"], to_id=test_company)
+        .returning(MembershipRequests.id)
+    )
+    membership_request_id = result.one()[0]
+    await db_session.commit()
+    return {
+        "id": membership_request_id,
+        "user_id": test_user["id"],
+        "company_id": test_company,
+    }
+
+
+@pytest_asyncio.fixture
+async def test_membership(db_session, test_user, test_company):
+    result = await db_session.execute(
+        insert(Memberships)
+        .values(user_id=test_user["id"], company_id=test_company)
+        .returning(Memberships.id)
+    )
+    membership_id = result.one()[0]
+    await db_session.commit()
+    return {"id": membership_id, "user_id": test_user["id"], "company_id": test_company}

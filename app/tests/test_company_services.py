@@ -12,7 +12,9 @@ from app.models.company_model import Company
 
 @pytest.mark.asyncio
 async def test_create_company(db_session, company_services_fixture, test_user):
-    company_data = CompanySchema(name="test", description="test", private=False)
+    company_data = CompanySchema(
+        owner=test_user["id"], name="test", description="test", private=False
+    )
 
     await company_services_fixture.create_company(
         test_user["id"],

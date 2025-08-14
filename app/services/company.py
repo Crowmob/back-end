@@ -7,6 +7,8 @@ from app.core.exceptions.company_exceptions import (
     CompanyUpdateException,
     AppException,
 )
+from app.schemas.company import CompanyUpdateRequestModel, CompanySchema
+from app.schemas.membership import MembershipSchema
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +22,13 @@ class CompanyServices:
         private: bool | None = True,
     ):
         async with UnitOfWork() as uow:
-            company_id = await uow.companies.create_company(
-                owner=owner, name=name, description=description, private=private
+            company_id = await uow.companies.create(
+                CompanySchema(
+                    owner=owner, name=name, description=description, private=private
+                )
+            )
+            await uow.memberships.create(
+                MembershipSchema(user_id=owner, company_id=company_id, role="owner")
             )
             logger.info(f"Company created: {name}")
             return company_id
@@ -40,7 +47,7 @@ class CompanyServices:
     @staticmethod
     async def get_company_by_id_with_uow(company_id: int, uow: UnitOfWork):
         try:
-            company = await uow.companies.get_company_by_id(company_id)
+            company = await uow.companies.get_by_id(company_id)
             if not company:
                 logger.warning(f"No company found with id={company_id}")
                 raise CompanyWithIdNotFoundException(company_id)
@@ -64,17 +71,13 @@ class CompanyServices:
     ):
         async with UnitOfWork() as uow:
             await self.get_company_by_id_with_uow(company_id, uow)
-            values_to_update = {
-                "name": name,
-                "description": description,
-                "private": private,
-            }
-            for key in list(values_to_update.keys()):
-                if values_to_update[key] is None:
-                    values_to_update.pop(key)
-            logger.info(values_to_update)
             try:
-                await uow.companies.update_company(company_id, values_to_update)
+                await uow.companies.update(
+                    company_id,
+                    CompanyUpdateRequestModel(
+                        name=name, description=description, private=private
+                    ),
+                )
 
                 logger.info(f"Company updated: id={company_id}")
 
@@ -90,7 +93,7 @@ class CompanyServices:
         async with UnitOfWork() as uow:
             await self.get_company_by_id_with_uow(company_id, uow)
             try:
-                await uow.companies.delete_company(company_id)
+                await uow.companies.delete(company_id)
                 logger.info(f"Company deleted: id={company_id}")
 
             except SQLAlchemyError as e:
