@@ -4,69 +4,45 @@ from sqlalchemy import update, delete, func
 
 from app.models.company_model import Company
 from app.models.membership_model import Memberships
-from app.schemas.company import CompanyDetailResponse
+from app.schemas.company import (
+    CompanyDetailResponse,
+    CompanySchema,
+    CompanyUpdateRequestModel,
+)
 from app.schemas.response_models import ListResponse
+from app.db.repositories.base_repository import BaseRepository
 
 
-class CompanyRepository:
+class CompanyRepository(
+    BaseRepository[Company, CompanySchema, CompanyUpdateRequestModel]
+):
     def __init__(self, session: AsyncSession):
-        self.session = session
-
-    async def create_company(
-        self, owner: int, name: str, description: str, private: bool = False
-    ):
-        new_company = Company(
-            owner=owner, name=name, description=description, private=private
-        )
-        self.session.add(new_company)
-        await self.session.flush()
-        await self.session.refresh(new_company)
-        return new_company.id
+        super().__init__(session, Company)
 
     async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
         stmt = (
             select(Company, func.count().over().label("total_count"))
-            .offset(offset)
-            .limit(limit)
+            .offset(offset or 0)
+            .limit(limit or 10)
         )
 
         result = await self.session.execute(stmt)
         rows = result.all()
 
-        if not rows:
-            return ListResponse[CompanyDetailResponse](items=[], count=0)
-
-        total_count = rows[0][1]
+        total_count = rows[0].total_count
 
         items = [
             CompanyDetailResponse(
-                id=company.id,
-                owner=company.owner,
-                name=company.name,
-                description=company.description,
-                private=company.private,
+                id=row.id,
+                owner=row.owner,
+                name=row.name,
+                description=row.description,
+                private=row.private,
             )
-            for company, _ in rows
+            for row, _ in rows
         ]
 
         return ListResponse[CompanyDetailResponse](items=items, count=total_count)
-
-    async def get_company_by_id(self, company_id: int):
-        result = await self.session.execute(
-            select(Company).where(Company.id == company_id)
-        )
-        company = result.scalar_one_or_none()
-        if not company:
-            return None
-        return CompanyDetailResponse.model_validate(company)
-
-    async def update_company(self, company_id: int, values_to_update):
-        await self.session.execute(
-            update(Company).where(Company.id == company_id).values(**values_to_update)
-        )
-
-    async def delete_company(self, company_id: int):
-        await self.session.execute(delete(Company).where(Company.id == company_id))
 
     async def get_companies_for_user(
         self, user_id: int, limit: int | None = None, offset: int | None = None

@@ -11,6 +11,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
+
 revision: str = "f200bf145e3f"
 down_revision: Union[str, Sequence[str], None] = "f7a6b74765b5"
 branch_labels: Union[str, Sequence[str], None] = None
@@ -45,6 +46,9 @@ def upgrade() -> None:
         "memberships",
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("company_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "role", sa.String(length=50), nullable=False, server_default="member"
+        ),
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column(
             "created_at",

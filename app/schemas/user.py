@@ -9,7 +9,7 @@ class UserSchema(BaseModel):
     email: str
     password: str | None = None
     about: str | None = None
-    avatar: str | None = None
+    avatar_ext: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -5,6 +5,11 @@ from app.db.unit_of_work import UnitOfWork
 from app.core.exceptions.membership_exceptions import (
     MembershipRequestWithIdNotFoundException,
 )
+from app.schemas.membership import (
+    MembershipRequestDetailResponse,
+    MembershipRequestSchema,
+    MembershipSchema,
+)
 from app.schemas.response_models import ListResponse
 from app.schemas.user import UserDetailResponse
 from app.schemas.company import CompanyDetailResponse
@@ -17,17 +22,23 @@ class MembershipServices:
     async def send_membership_request(request_type: str, company_id: int, user_id: int):
         async with UnitOfWork() as uow:
             try:
-                membership_request = await uow.memberships.get_membership_request(
-                    request_type, company_id, user_id
+                membership_request = (
+                    await uow.membership_requests.get_membership_request(
+                        request_type, company_id, user_id
+                    )
                 )
                 if not membership_request:
                     if request_type == "request":
-                        membership_id = await uow.memberships.create_membership_request(
-                            request_type, user_id, company_id
+                        membership_id = await uow.membership_requests.create(
+                            MembershipRequestSchema(
+                                type=request_type, to_id=company_id, from_id=user_id
+                            )
                         )
-                    elif request_type == "invite":
-                        membership_id = await uow.memberships.create_membership_request(
-                            request_type, company_id, user_id
+                    else:
+                        membership_id = await uow.membership_requests.create(
+                            MembershipRequestSchema(
+                                type=request_type, to_id=company_id, from_id=user_id
+                            )
                         )
                     logger.info("Created membership request")
                     return membership_id
@@ -40,7 +51,7 @@ class MembershipServices:
     async def cancel_membership_request(request_id: int):
         async with UnitOfWork() as uow:
             try:
-                await uow.memberships.delete_membership_request(request_id)
+                await uow.membership_requests.delete(request_id)
                 logger.info(f"Deleted membership request with ID {request_id}")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
@@ -50,19 +61,24 @@ class MembershipServices:
     async def accept_membership_request(request_id: int):
         async with UnitOfWork() as uow:
             try:
-                membership_request = await uow.memberships.get_membership_request_by_id(
-                    request_id
-                )
+                membership_request = await uow.membership_requests.get_by_id(request_id)
                 if membership_request is None:
                     raise MembershipRequestWithIdNotFoundException(request_id)
-                await uow.memberships.delete_membership_request(request_id)
+                await uow.membership_requests.delete(request_id)
                 if membership_request.type == "request":
-                    membership_id = await uow.memberships.create_membership(
-                        membership_request.from_id, membership_request.to_id
+                    membership_id = await uow.memberships.create(
+                        MembershipSchema(
+                            role="member",
+                            user_id=membership_request.from_id,
+                            company_id=membership_request.to_id,
+                        )
                     )
                 elif membership_request.type == "invite":
                     membership_id = await uow.memberships.create_membership(
-                        membership_request.to_id, membership_request.from_id
+                        MembershipSchema(
+                            user_id=membership_request.from_id,
+                            company_id=membership_request.to_id,
+                        )
                     )
                 logger.info("Created membership successfully")
                 return membership_id
@@ -91,21 +107,17 @@ class MembershipServices:
         async with UnitOfWork() as uow:
             try:
                 membership_requests = (
-                    await uow.memberships.get_membership_requests_for_user(
+                    await uow.membership_requests.get_membership_requests_for_user(
                         request_type, user_id, limit, offset
                     )
                 )
                 items = []
                 for request in membership_requests.items:
                     if request.request_type == "request":
-                        items.append(
-                            await uow.companies.get_company_by_id(request.to_id)
-                        )
+                        items.append(await uow.companies.get_by_id(request.to_id))
                         logger.info(request.to_id)
                     elif request.request_type == "invite":
-                        items.append(
-                            await uow.companies.get_company_by_id(request.from_id)
-                        )
+                        items.append(await uow.companies.get_by_id(request.from_id))
                 return ListResponse[CompanyDetailResponse](
                     items=items, count=len(membership_requests.items)
                 )
@@ -123,16 +135,16 @@ class MembershipServices:
         async with UnitOfWork() as uow:
             try:
                 membership_requests = (
-                    await uow.memberships.get_membership_requests_to_company(
+                    await uow.membership_requests.get_membership_requests_to_company(
                         request_type, company_id, limit, offset
                     )
                 )
                 items = []
                 for request in membership_requests.items:
                     if request.request_type == "request":
-                        items.append(await uow.users.get_user_by_id(request.from_id))
+                        items.append(await uow.users.get_by_id(request.from_id))
                     elif request.request_type == "invite":
-                        items.append(await uow.users.get_user_by_id(request.to_id))
+                        items.append(await uow.users.get_by_id(request.to_id))
                 return ListResponse[UserDetailResponse](
                     items=items, count=len(membership_requests.items)
                 )
