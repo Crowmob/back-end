@@ -13,12 +13,7 @@ from app.models.user_model import User
 from app.models.membership_model import Memberships, MembershipRequests
 from app.services.admin import admin_services
 from app.services.membership import membership_services
-from app.utils.db import (
-    truncate_users_table,
-    truncate_companies_table,
-    truncate_memberships_table,
-    truncate_membership_requests_table,
-)
+from app.utils.db import clear_tables
 
 
 @pytest_asyncio.fixture
@@ -28,10 +23,7 @@ async def db_session():
         engine, class_=AsyncSession, expire_on_commit=False
     )
     async with test_session_maker() as session:
-        await truncate_users_table(session)
-        await truncate_companies_table(session)
-        await truncate_memberships_table(session)
-        await truncate_membership_requests_table(session)
+        await clear_tables(session)
         yield session
         await session.rollback()
 

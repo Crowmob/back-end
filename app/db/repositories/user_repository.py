@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, func, and_
+from sqlalchemy import update, func, and_, Select
 
 from app.models.user_model import User, Identities
 from app.models.membership_model import Memberships
@@ -19,8 +19,8 @@ class UserRepository(BaseRepository[User, UserSchema, UserUpdateRequestModel]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, User)
 
-    async def return_members(self, stmt):
-        result = await self.session.execute(stmt)
+    async def return_members(self, query: Select):
+        result = await self.session.execute(query)
         rows = result.all()
 
         if not rows:
@@ -43,15 +43,18 @@ class UserRepository(BaseRepository[User, UserSchema, UserUpdateRequestModel]):
         return ListResponse[MemberDetailResponse](items=items, count=total_count)
 
     async def get_all_users(self, limit: int | None = None, offset: int | None = None):
-        stmt = (
+        query = (
             select(User, func.count().over().label("total_count"))
             .where(User.has_profile)
             .offset(offset or 0)
             .limit(limit or 10)
         )
 
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(query)
         rows = result.all()
+
+        if not rows:
+            return ListResponse[UserDetailResponse](items=[], count=0)
 
         total_count = rows[0].total_count
 
@@ -108,7 +111,7 @@ class UserRepository(BaseRepository[User, UserSchema, UserUpdateRequestModel]):
     async def get_users_in_company(
         self, company_id: int, limit: int | None = None, offset: int | None = None
     ):
-        stmt = (
+        query = (
             select(User, Memberships.role, func.count().over().label("total_count"))
             .join(Memberships, User.id == Memberships.user_id)
             .filter(Memberships.company_id == company_id)
@@ -116,12 +119,12 @@ class UserRepository(BaseRepository[User, UserSchema, UserUpdateRequestModel]):
             .offset(offset or 0)
         )
 
-        return await self.return_members(stmt)
+        return await self.return_members(query)
 
     async def get_all_admins(
         self, company_id: int, limit: int | None = None, offset: int | None = None
     ):
-        stmt = (
+        query = (
             select(User, Memberships.role, func.count().over().label("total_count"))
             .join(
                 Memberships,
@@ -132,4 +135,4 @@ class UserRepository(BaseRepository[User, UserSchema, UserUpdateRequestModel]):
             .offset(offset or 0)
         )
 
-        return await self.return_members(stmt)
+        return await self.return_members(query)

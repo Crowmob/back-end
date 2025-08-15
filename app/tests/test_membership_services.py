@@ -122,13 +122,13 @@ async def test_get_membership_requests_to_company(
 ):
     membership_requests = (
         await membership_services_fixture.get_membership_requests_to_company(
-            "request", test_membership_request["user_id"], limit=5, offset=0
+            "request", test_membership_request["company_id"], limit=5, offset=0
         )
     )
     assert len(membership_requests.items) >= 1
     membership_requests = (
-        await membership_services_fixture.get_membership_requests_for_user(
-            "invite", test_membership_request["user_id"], limit=5, offset=0
+        await membership_services_fixture.get_membership_requests_to_company(
+            "invite", test_membership_request["company_id"], limit=5, offset=0
         )
     )
     assert len(membership_requests.items) == 0

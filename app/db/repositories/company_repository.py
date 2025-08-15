@@ -20,14 +20,17 @@ class CompanyRepository(
         super().__init__(session, Company)
 
     async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
-        stmt = (
+        query = (
             select(Company, func.count().over().label("total_count"))
             .offset(offset or 0)
             .limit(limit or 10)
         )
 
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(query)
         rows = result.all()
+
+        if not rows:
+            return ListResponse[CompanyDetailResponse](items=[], count=0)
 
         total_count = rows[0].total_count
 
@@ -47,7 +50,7 @@ class CompanyRepository(
     async def get_companies_for_user(
         self, user_id: int, limit: int | None = None, offset: int | None = None
     ):
-        stmt = (
+        query = (
             select(Company, Memberships.role, func.count().over().label("total_count"))
             .join(Memberships, Company.id == Memberships.company_id)
             .filter(Memberships.user_id == user_id)
@@ -55,7 +58,7 @@ class CompanyRepository(
             .offset(offset or 0)
         )
 
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(query)
         rows = result.all()
 
         if not rows:

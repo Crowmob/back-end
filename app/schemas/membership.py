@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.base import IDMixin, TimestampMixin
+from app.schemas.base import IDMixin, TimestampMixin, PaginationMixin
 
 
 class MembershipRequestSchema(BaseModel):
@@ -30,36 +30,26 @@ class MembershipDetailResponse(IDMixin, TimestampMixin, BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class GetUserMembershipRequests(BaseModel):
+class GetUserMembershipRequests(PaginationMixin, BaseModel):
     request_type: str
     user_id: int
-    limit: int | None = None
-    offset: int | None = None
 
 
-class GetMembershipRequestsToCompany(BaseModel):
+class GetMembershipRequestsToCompany(PaginationMixin, BaseModel):
     request_type: str
     company_id: int
-    limit: int | None = None
-    offset: int | None = None
 
 
-class GetCompaniesForUserRequest(BaseModel):
+class GetCompaniesForUserRequest(PaginationMixin, BaseModel):
     user_id: int
-    limit: int | None = None
-    offset: int | None = None
 
 
-class GetUsersInCompanyRequest(BaseModel):
+class GetUsersInCompanyRequest(PaginationMixin, BaseModel):
     company_id: int
-    limit: int | None = None
-    offset: int | None = None
 
 
-class GetAllAdminsRequest(BaseModel):
+class GetAllAdminsRequest(PaginationMixin, BaseModel):
     company_id: int
-    limit: int | None = None
-    offset: int | None = None
 
 
 class LeaveCompanyRequest(BaseModel):

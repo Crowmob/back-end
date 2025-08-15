@@ -46,7 +46,7 @@ class MembershipRequestsRepository(
         limit: int | None = None,
         offset: int | None = None,
     ):
-        stmt = (
+        query = (
             select(MembershipRequests, func.count().over().label("total_count"))
             .where(
                 and_(
@@ -63,7 +63,7 @@ class MembershipRequestsRepository(
             .limit(limit or 5)
         )
 
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(query)
         rows = result.all()
 
         if not rows:
@@ -99,7 +99,7 @@ class MembershipRequestsRepository(
                 MembershipRequests.from_id == Company.id, Company.id == company_id
             )
 
-        stmt = (
+        query = (
             select(MembershipRequests, func.count().over().label("total_count"))
             .join(Company, join_condition)
             .where(MembershipRequests.type == request_type)
@@ -107,7 +107,7 @@ class MembershipRequestsRepository(
             .limit(limit or 5)
         )
 
-        result = await self.session.execute(stmt)
+        result = await self.session.execute(query)
         rows = result.all()
 
         if not rows:

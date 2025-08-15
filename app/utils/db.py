@@ -1,24 +1,14 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+from sqlalchemy import delete
+
+from app.models.user_model import User
+from app.models.company_model import Company
+from app.models.membership_model import Memberships, MembershipRequests
 
 
-async def truncate_users_table(session: AsyncSession):
-    await session.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE;"))
-    await session.commit()
-
-
-async def truncate_companies_table(session: AsyncSession):
-    await session.execute(text("TRUNCATE TABLE companies RESTART IDENTITY CASCADE;"))
-    await session.commit()
-
-
-async def truncate_memberships_table(session: AsyncSession):
-    await session.execute(text("TRUNCATE TABLE memberships RESTART IDENTITY CASCADE;"))
-    await session.commit()
-
-
-async def truncate_membership_requests_table(session: AsyncSession):
-    await session.execute(
-        text("TRUNCATE TABLE membership_requests RESTART IDENTITY CASCADE;")
-    )
+async def clear_tables(session: AsyncSession):
+    await session.execute(delete(User))
+    await session.execute(delete(Company))
+    await session.execute(delete(Memberships))
+    await session.execute(delete(MembershipRequests))
     await session.commit()

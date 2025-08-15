@@ -37,7 +37,7 @@ class MembershipServices:
                     else:
                         membership_id = await uow.membership_requests.create(
                             MembershipRequestSchema(
-                                type=request_type, to_id=company_id, from_id=user_id
+                                type=request_type, to_id=user_id, from_id=company_id
                             )
                         )
                     logger.info("Created membership request")
