@@ -5,6 +5,7 @@ from app.db.unit_of_work import UnitOfWork
 from app.core.exceptions.membership_exceptions import (
     MembershipRequestWithIdNotFoundException,
 )
+from app.models.membership_model import RoleEnum
 from app.schemas.membership import (
     MembershipRequestDetailResponse,
     MembershipRequestSchema,
@@ -28,18 +29,12 @@ class MembershipServices:
                     )
                 )
                 if not membership_request:
-                    if request_type == "request":
-                        membership_id = await uow.membership_requests.create(
-                            MembershipRequestSchema(
-                                type=request_type, to_id=company_id, from_id=user_id
-                            )
-                        )
-                    else:
-                        membership_id = await uow.membership_requests.create(
-                            MembershipRequestSchema(
-                                type=request_type, to_id=user_id, from_id=company_id
-                            )
-                        )
+                    membership_request = MembershipRequestSchema(
+                        type=request_type, company_id=company_id, user_id=user_id
+                    )
+                    membership_id = await uow.membership_requests.create(
+                        membership_request.model_dump()
+                    )
                     logger.info("Created membership request")
                     return membership_id
                 return membership_request.id
@@ -65,21 +60,12 @@ class MembershipServices:
                 if membership_request is None:
                     raise MembershipRequestWithIdNotFoundException(request_id)
                 await uow.membership_requests.delete(request_id)
-                if membership_request.type == "request":
-                    membership_id = await uow.memberships.create(
-                        MembershipSchema(
-                            role="member",
-                            user_id=membership_request.from_id,
-                            company_id=membership_request.to_id,
-                        )
-                    )
-                elif membership_request.type == "invite":
-                    membership_id = await uow.memberships.create_membership(
-                        MembershipSchema(
-                            user_id=membership_request.from_id,
-                            company_id=membership_request.to_id,
-                        )
-                    )
+                membership = MembershipSchema(
+                    role=RoleEnum.MEMBER.value,
+                    user_id=membership_request.user_id,
+                    company_id=membership_request.company_id,
+                )
+                membership_id = await uow.memberships.create(membership.model_dump())
                 logger.info("Created membership successfully")
                 return membership_id
             except SQLAlchemyError as e:
@@ -111,16 +97,10 @@ class MembershipServices:
                         request_type, user_id, limit, offset
                     )
                 )
-                items = []
-                for request in membership_requests.items:
-                    if request.request_type == "request":
-                        items.append(await uow.companies.get_by_id(request.to_id))
-                        logger.info(request.to_id)
-                    elif request.request_type == "invite":
-                        items.append(await uow.companies.get_by_id(request.from_id))
-                return ListResponse[CompanyDetailResponse](
-                    items=items, count=len(membership_requests.items)
-                )
+                company_ids = [
+                    request.company_id for request in membership_requests.items
+                ]
+                return await uow.companies.get_companies_by_ids(company_ids)
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise
@@ -139,15 +119,8 @@ class MembershipServices:
                         request_type, company_id, limit, offset
                     )
                 )
-                items = []
-                for request in membership_requests.items:
-                    if request.request_type == "request":
-                        items.append(await uow.users.get_by_id(request.from_id))
-                    elif request.request_type == "invite":
-                        items.append(await uow.users.get_by_id(request.to_id))
-                return ListResponse[UserDetailResponse](
-                    items=items, count=len(membership_requests.items)
-                )
+                user_ids = [request.user_id for request in membership_requests.items]
+                return await uow.users.get_users_by_ids(user_ids)
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise

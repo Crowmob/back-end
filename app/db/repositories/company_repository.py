@@ -13,9 +13,7 @@ from app.schemas.response_models import ListResponse
 from app.db.repositories.base_repository import BaseRepository
 
 
-class CompanyRepository(
-    BaseRepository[Company, CompanySchema, CompanyUpdateRequestModel]
-):
+class CompanyRepository(BaseRepository[Company]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, Company)
 
@@ -78,4 +76,28 @@ class CompanyRepository(
             for company, role, _ in rows
         ]
 
+        return ListResponse[CompanyDetailResponse](items=items, count=total_count)
+
+    async def get_companies_by_ids(self, ids: list):
+        if not ids:
+            return ListResponse[CompanyDetailResponse](items=[], count=0)
+        query = select(Company, func.count().over().label("total_count")).where(
+            Company.id.in_(ids)
+        )
+
+        result = await self.session.execute(query)
+        rows = result.all()
+
+        total_count = rows[0][1]
+
+        items = [
+            CompanyDetailResponse(
+                id=company.id,
+                owner=company.owner,
+                name=company.name,
+                description=company.description,
+                private=company.private,
+            )
+            for company, _ in rows
+        ]
         return ListResponse[CompanyDetailResponse](items=items, count=total_count)

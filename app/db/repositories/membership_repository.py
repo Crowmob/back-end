@@ -3,12 +3,9 @@ from sqlalchemy import delete, and_, update
 
 from app.db.repositories.base_repository import BaseRepository
 from app.models.membership_model import Memberships
-from app.schemas.membership import (
-    MembershipDetailResponse,
-)
 
 
-class MembershipRepository(BaseRepository[Memberships, MembershipDetailResponse, None]):
+class MembershipRepository(BaseRepository[Memberships]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, Memberships)
 
@@ -24,7 +21,7 @@ class MembershipRepository(BaseRepository[Memberships, MembershipDetailResponse,
     async def appoint_admin(self, user_id: int, company_id: int):
         await self.session.execute(
             update(Memberships)
-            .values(role="admin")
+            .values(role="ADMIN")
             .where(
                 and_(
                     Memberships.user_id == user_id, Memberships.company_id == company_id
@@ -35,7 +32,7 @@ class MembershipRepository(BaseRepository[Memberships, MembershipDetailResponse,
     async def remove_admin(self, user_id: int, company_id: int):
         await self.session.execute(
             update(Memberships)
-            .values(role="member")
+            .values(role="MEMBER")
             .where(
                 and_(
                     Memberships.user_id == user_id, Memberships.company_id == company_id

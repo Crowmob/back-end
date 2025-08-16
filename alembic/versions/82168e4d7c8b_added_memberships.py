@@ -1,8 +1,8 @@
 """added memberships
 
-Revision ID: f200bf145e3f
+Revision ID: 82168e4d7c8b
 Revises: f7a6b74765b5
-Create Date: 2025-08-08 15:27:29.591160
+Create Date: 2025-08-16 12:25:56.028392
 
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "f200bf145e3f"
+revision: str = "82168e4d7c8b"
 down_revision: Union[str, Sequence[str], None] = "f7a6b74765b5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -22,8 +22,8 @@ def upgrade() -> None:
     op.create_table(
         "membership_requests",
         sa.Column("type", sa.String(length=50), nullable=False),
-        sa.Column("from_id", sa.Integer(), nullable=False),
-        sa.Column("to_id", sa.Integer(), nullable=False),
+        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column("company_id", sa.Integer(), nullable=False),
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column(
             "created_at",
@@ -37,6 +37,8 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
+        sa.ForeignKeyConstraint(["company_id"], ["companies.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -47,7 +49,9 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer(), nullable=False),
         sa.Column("company_id", sa.Integer(), nullable=False),
         sa.Column(
-            "role", sa.String(length=50), nullable=False, server_default="member"
+            "role",
+            sa.Enum("member", "admin", "owner", name="role_enum"),
+            nullable=False,
         ),
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column(

@@ -8,35 +8,22 @@ from app.schemas.response_models import ListResponse
 from app.models.company_model import Company
 
 
-class MembershipRequestsRepository(
-    BaseRepository[MembershipRequests, MembershipRequestDetailResponse, None]
-):
+class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, MembershipRequests)
 
     async def get_membership_request(
         self, request_type: str, user_id: int, company_id: int
     ):
-        query = select(MembershipRequests)
-
-        if request_type == "request":
-            query = query.where(
+        result = await self.session.execute(
+            select(MembershipRequests).where(
                 and_(
                     MembershipRequests.type == request_type,
-                    MembershipRequests.from_id == user_id,
-                    MembershipRequests.to_id == company_id,
+                    MembershipRequests.user_id == user_id,
+                    MembershipRequests.company_id == company_id,
                 )
             )
-        elif request_type == "invite":
-            query = query.where(
-                and_(
-                    MembershipRequests.type == request_type,
-                    MembershipRequests.from_id == company_id,
-                    MembershipRequests.to_id == user_id,
-                )
-            )
-
-        result = await self.session.execute(query)
+        )
         return result.scalar_one_or_none()
 
     async def get_membership_requests_for_user(
@@ -51,12 +38,7 @@ class MembershipRequestsRepository(
             .where(
                 and_(
                     MembershipRequests.type == request_type,
-                    (
-                        MembershipRequests.from_id
-                        if request_type == "request"
-                        else MembershipRequests.to_id
-                    )
-                    == user_id,
+                    MembershipRequests.user_id == user_id,
                 )
             )
             .offset(offset or 0)
@@ -74,8 +56,8 @@ class MembershipRequestsRepository(
             MembershipRequestDetailResponse(
                 id=request.id,
                 type=request.type,
-                from_id=request.from_id,
-                to_id=request.to_id,
+                company_id=request.company_id,
+                user_id=request.user_id,
             )
             for request, _ in rows
         ]
@@ -90,18 +72,15 @@ class MembershipRequestsRepository(
         limit: int | None = None,
         offset: int | None = None,
     ):
-        if request_type == "request":
-            join_condition = and_(
-                MembershipRequests.to_id == Company.id, Company.id == company_id
-            )
-        else:
-            join_condition = and_(
-                MembershipRequests.from_id == Company.id, Company.id == company_id
-            )
-
         query = (
             select(MembershipRequests, func.count().over().label("total_count"))
-            .join(Company, join_condition)
+            .join(
+                Company,
+                and_(
+                    MembershipRequests.company_id == Company.id,
+                    Company.id == company_id,
+                ),
+            )
             .where(MembershipRequests.type == request_type)
             .offset(offset or 0)
             .limit(limit or 5)
@@ -116,7 +95,7 @@ class MembershipRequestsRepository(
         total_count = rows[0][1]
         items = [
             MembershipRequestDetailResponse(
-                id=req.id, type=req.type, from_id=req.from_id, to_id=req.to_id
+                id=req.id, type=req.type, company_id=req.company_id, user_id=req.user_id
             )
             for req, _ in rows
         ]

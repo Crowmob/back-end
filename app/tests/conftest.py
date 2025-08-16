@@ -10,7 +10,7 @@ from app.services.company import company_services
 from app.db.unit_of_work import UnitOfWork
 from app.utils.settings_model import settings
 from app.models.user_model import User
-from app.models.membership_model import Memberships, MembershipRequests
+from app.models.membership_model import Memberships, MembershipRequests, RoleEnum
 from app.services.admin import admin_services
 from app.services.membership import membership_services
 from app.utils.db import clear_tables
@@ -92,7 +92,7 @@ async def test_company(db_session, test_user):
 async def test_membership_request(db_session, test_user, test_company):
     result = await db_session.execute(
         insert(MembershipRequests)
-        .values(type="request", from_id=test_user["id"], to_id=test_company)
+        .values(type="request", user_id=test_user["id"], company_id=test_company)
         .returning(MembershipRequests.id)
     )
     membership_request_id = result.one()[0]
@@ -120,7 +120,9 @@ async def test_membership(db_session, test_user, test_company):
 async def test_admin(db_session, test_user, test_company):
     result = await db_session.execute(
         insert(Memberships)
-        .values(role="admin", user_id=test_user["id"], company_id=test_company)
+        .values(
+            role=RoleEnum.ADMIN.value, user_id=test_user["id"], company_id=test_company
+        )
         .returning(Memberships.id)
     )
     membership_id = result.one()[0]

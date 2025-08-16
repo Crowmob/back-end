@@ -34,14 +34,13 @@ class UserServices:
             if password:
                 password = password_services.hash_password(password)
             try:
-                user_id = await uow.users.create(
-                    UserSchema(
-                        username=username,
-                        email=email,
-                        password=password,
-                        avatar_ext=avatar_ext,
-                    )
+                user = UserSchema(
+                    username=username,
+                    email=email,
+                    password=password,
+                    avatar_ext=avatar_ext,
                 )
+                user_id = await uow.users.create(user.model_dump())
                 logger.info(f"User created: {username}")
 
             except IntegrityError:
@@ -150,14 +149,15 @@ class UserServices:
             if password:
                 password = password_services.hash_password(password)
             try:
+                update_model = UserUpdateRequestModel(
+                    username=username,
+                    password=password,
+                    about=about,
+                    avatar_ext=ext if ext else user.avatar,
+                )
                 await uow.users.update(
                     user_id,
-                    UserUpdateRequestModel(
-                        username=username,
-                        password=password,
-                        about=about,
-                        avatar_ext=ext if ext else user.avatar,
-                    ),
+                    update_model.model_dump(),
                 )
 
                 logger.info(f"User updated: id={user_id}")

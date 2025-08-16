@@ -2,7 +2,7 @@ import pytest
 
 from sqlalchemy import select, and_
 
-from app.models.membership_model import Memberships
+from app.models.membership_model import Memberships, RoleEnum
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ async def test_appoint_admin(db_session, admin_services_fixture, test_membership
         )
     )
     membership = response.scalars().first()
-    assert membership.role == "admin"
+    assert membership.role == RoleEnum.ADMIN
 
 
 @pytest.mark.asyncio
@@ -36,7 +36,7 @@ async def test_remove_admin(db_session, admin_services_fixture, test_admin):
         )
     )
     membership = response.scalars().first()
-    assert membership.role == "member"
+    assert membership.role == RoleEnum.MEMBER
 
 
 @pytest.mark.asyncio

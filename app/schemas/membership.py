@@ -5,8 +5,8 @@ from app.schemas.base import IDMixin, TimestampMixin, PaginationMixin
 
 class MembershipRequestSchema(BaseModel):
     type: str
-    from_id: int
-    to_id: int
+    company_id: int
+    user_id: int
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -18,8 +18,8 @@ class MembershipSchema(BaseModel):
 
 class MembershipRequestDetailResponse(IDMixin, TimestampMixin, BaseModel):
     request_type: str = Field(..., alias="type")
-    from_id: int
-    to_id: int
+    company_id: int
+    user_id: int
     model_config = ConfigDict(from_attributes=True)
 
 

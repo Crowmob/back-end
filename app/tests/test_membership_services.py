@@ -16,8 +16,8 @@ async def test_send_membership_request(
     )
     membership_request = result.scalar_one()
     assert membership_request.type == "invite"
-    assert membership_request.from_id == test_company
-    assert membership_request.to_id == test_user["id"]
+    assert membership_request.company_id == test_company
+    assert membership_request.user_id == test_user["id"]
 
     membership_id = await membership_services_fixture.send_membership_request(
         "request", test_company, test_user["id"]
@@ -27,8 +27,8 @@ async def test_send_membership_request(
     )
     membership_request = result.scalar_one()
     assert membership_request.type == "request"
-    assert membership_request.from_id == test_user["id"]
-    assert membership_request.to_id == test_company
+    assert membership_request.user_id == test_user["id"]
+    assert membership_request.company_id == test_company
 
 
 @pytest.mark.asyncio
