@@ -7,6 +7,7 @@ from app.core.exceptions.company_exceptions import (
     CompanyUpdateException,
     AppException,
 )
+from app.models.membership_model import RoleEnum
 from app.schemas.company import CompanyUpdateRequestModel, CompanySchema
 from app.schemas.membership import MembershipSchema
 
@@ -22,14 +23,15 @@ class CompanyServices:
         private: bool | None = True,
     ):
         async with UnitOfWork() as uow:
-            company_id = await uow.companies.create(
-                CompanySchema(
-                    owner=owner, name=name, description=description, private=private
-                )
+            company = CompanySchema(
+                owner=owner, name=name, description=description, private=private
             )
-            await uow.memberships.create(
-                MembershipSchema(user_id=owner, company_id=company_id, role="owner")
+            company_id = await uow.companies.create(company.model_dump())
+            logger.info(RoleEnum.OWNER.value)
+            membership = MembershipSchema(
+                user_id=owner, company_id=company_id, role=RoleEnum.OWNER.value
             )
+            await uow.memberships.create(membership.model_dump())
             logger.info(f"Company created: {name}")
             return company_id
 
@@ -39,6 +41,7 @@ class CompanyServices:
             try:
                 companies = await uow.companies.get_all_companies(limit, offset)
                 logger.info("Fetched companies")
+                logger.info(companies)
                 return companies
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
@@ -72,11 +75,12 @@ class CompanyServices:
         async with UnitOfWork() as uow:
             await self.get_company_by_id_with_uow(company_id, uow)
             try:
+                update_model = CompanyUpdateRequestModel(
+                    name=name, description=description, private=private
+                )
                 await uow.companies.update(
                     company_id,
-                    CompanyUpdateRequestModel(
-                        name=name, description=description, private=private
-                    ),
+                    update_model.model_dump(),
                 )
 
                 logger.info(f"Company updated: id={company_id}")

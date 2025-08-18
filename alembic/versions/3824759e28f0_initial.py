@@ -45,13 +45,9 @@ def upgrade() -> None:
     op.create_index(op.f("ix_users_email"), "users", ["email"], unique=True)
     op.create_index(op.f("ix_users_id"), "users", ["id"], unique=False)
     op.create_index(op.f("ix_users_username"), "users", ["username"], unique=False)
-    op.create_foreign_key(
-        None, "identities", "users", ["user_id"], ["id"], ondelete="CASCADE"
-    )
 
 
 def downgrade() -> None:
-    op.drop_constraint(None, "identities", type_="foreignkey")
     op.drop_index(op.f("ix_users_username"), table_name="users")
     op.drop_index(op.f("ix_users_id"), table_name="users")
     op.drop_index(op.f("ix_users_email"), table_name="users")

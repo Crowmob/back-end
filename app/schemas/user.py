@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict, HttpUrl
 from pydantic.generics import GenericModel
 
-from app.schemas.base import IDMixin, TimestampMixin
+from app.schemas.base import IDMixin, TimestampMixin, PaginationMixin
 
 
 class UserSchema(BaseModel):
@@ -34,12 +34,12 @@ class UserUpdateRequestModel(BaseModel):
     username: str | None = None
     password: str | None = None
     about: str | None = None
+    avatar_ext: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
-class GetAllUsersRequestModel(BaseModel):
-    limit: int | None = None
-    offset: int | None = None
+class GetAllUsersRequestModel(PaginationMixin, BaseModel):
+    pass
 
 
 class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
@@ -47,5 +47,15 @@ class UserDetailResponse(IDMixin, TimestampMixin, BaseModel):
     email: str
     about: str | None = None
     avatar: str | None = None
+    current_user: bool | None = False
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MemberDetailResponse(IDMixin, TimestampMixin, BaseModel):
+    username: str | None = None
+    email: str
+    about: str | None = None
+    avatar: str | None = None
+    role: str | None = None
     current_user: bool | None = False
     model_config = ConfigDict(from_attributes=True)

@@ -1,12 +1,12 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.base import IDMixin, TimestampMixin
+from app.schemas.base import IDMixin, TimestampMixin, PaginationMixin
 
 
 class MembershipRequestSchema(BaseModel):
     type: str
-    from_id: int
-    to_id: int
+    company_id: int
+    user_id: int
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -16,45 +16,64 @@ class MembershipSchema(BaseModel):
     company_id: int
 
 
+class GetMembershipRequest(BaseModel):
+    user_id: int
+    company_id: int
+
+
 class MembershipRequestDetailResponse(IDMixin, TimestampMixin, BaseModel):
-    type: str
-    from_id: int
-    to_id: int
+    request_type: str = Field(..., alias="type")
+    company_id: int
+    user_id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+class CancelMembershipRequest(BaseModel):
+    user_id: int
+    company_id: int
 
 
 class MembershipDetailResponse(IDMixin, TimestampMixin, BaseModel):
+    role: str
     user_id: int
     company_id: int
     model_config = ConfigDict(from_attributes=True)
 
 
-class GetUserMembershipRequests(BaseModel):
+class GetUserMembershipRequests(PaginationMixin, BaseModel):
     request_type: str
     user_id: int
-    limit: int | None = None
-    offset: int | None = None
 
 
-class GetOwnerMembershipRequests(IDMixin, TimestampMixin, BaseModel):
+class AcceptMembershipRequest(BaseModel):
     request_type: str
-    owner_id: int
-    limit: int | None = None
-    offset: int | None = None
-
-
-class GetCompaniesForUserRequest(BaseModel):
-    user_id: int
-    limit: int | None = None
-    offset: int | None = None
-
-
-class GetUsersInCompanyRequest(BaseModel):
     company_id: int
-    limit: int | None = None
-    offset: int | None = None
+    user_id: int
+
+
+class GetMembershipRequestsToCompany(PaginationMixin, BaseModel):
+    request_type: str
+    company_id: int
+
+
+class GetCompaniesForUserRequest(PaginationMixin, BaseModel):
+    user_id: int
+
+
+class GetUsersInCompanyRequest(PaginationMixin, BaseModel):
+    company_id: int
+
+
+class GetAllAdminsRequest(PaginationMixin, BaseModel):
+    company_id: int
 
 
 class LeaveCompanyRequest(BaseModel):
+    company_id: int
+    user_id: int
+
+
+class SendMembershipRequest(BaseModel):
+    request_type: str
     company_id: int
     user_id: int

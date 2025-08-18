@@ -34,14 +34,13 @@ class UserServices:
             if password:
                 password = password_services.hash_password(password)
             try:
-                user_id = await uow.users.create(
-                    UserSchema(
-                        username=username,
-                        email=email,
-                        password=password,
-                        avatar_ext=avatar_ext,
-                    )
+                user = UserSchema(
+                    username=username,
+                    email=email,
+                    password=password,
+                    avatar_ext=avatar_ext,
                 )
+                user_id = await uow.users.create(user.model_dump())
                 logger.info(f"User created: {username}")
 
             except IntegrityError:
@@ -55,20 +54,6 @@ class UserServices:
 
                 user_id = user.id
 
-            if auth_provider and oauth_id:
-                exists = await uow.users.identity_exists(oauth_id)
-                if exists:
-                    logger.warning(
-                        f"Identity for provider {auth_provider} already exists."
-                    )
-                else:
-                    await uow.users.create_identity(
-                        user_id=user_id,
-                        provider=auth_provider,
-                        provider_id=oauth_id,
-                    )
-                    logger.info(f"Created identity for provider {auth_provider}")
-
             return user_id
 
     @staticmethod
@@ -77,6 +62,7 @@ class UserServices:
             try:
                 users = await uow.users.get_all_users(limit, offset)
                 logger.info("Fetched users")
+                logger.info(users)
                 return users
 
             except SQLAlchemyError as e:
@@ -131,7 +117,7 @@ class UserServices:
         avatar: UploadFile | None = None,
     ):
         async with UnitOfWork() as uow:
-            await self.get_user_by_id_with_uow(user_id, uow)
+            user = await self.get_user_by_id_with_uow(user_id, uow)
             if avatar:
                 ext = avatar.filename.split(".")[-1]
                 filename = f"{user_id}.{ext}"
@@ -144,14 +130,22 @@ class UserServices:
                 async with aiofiles.open(filepath, "wb") as out_file:
                     while content := await avatar.read(1024):
                         await out_file.write(content)
+            else:
+                ext = None
             if password:
                 password = password_services.hash_password(password)
             try:
+                update_model = UserUpdateRequestModel(
+                    username=username,
+                    password=password,
+                    about=about,
+                    avatar_ext=ext
+                    if ext
+                    else (user.avatar.split(".")[-1] if user.avatar else None),
+                )
                 await uow.users.update(
                     user_id,
-                    UserUpdateRequestModel(
-                        username=username, password=password, about=about
-                    ),
+                    update_model.model_dump(),
                 )
 
                 logger.info(f"User updated: id={user_id}")

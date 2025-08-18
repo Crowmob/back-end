@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from pydantic.generics import GenericModel
 
-from app.schemas.base import IDMixin
+from app.schemas.base import IDMixin, PaginationMixin
 
 
 class CompanySchema(BaseModel):
@@ -22,6 +22,7 @@ class CompanyDetailResponse(IDMixin, BaseModel):
     description: str | None = None
     private: bool | None = False
     is_owner: bool | None = False
+    user_role: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -31,6 +32,5 @@ class CompanyUpdateRequestModel(BaseModel):
     private: bool | None = False
 
 
-class GetAllCompaniesRequest(BaseModel):
-    limit: int | None = None
-    offset: int | None = None
+class GetAllCompaniesRequest(PaginationMixin, BaseModel):
+    pass

@@ -9,15 +9,15 @@ async def test_send_membership_request(
     db_session, membership_services_fixture, test_company, test_user
 ):
     membership_id = await membership_services_fixture.send_membership_request(
-        "invitation", test_company, test_user["id"]
+        "invite", test_company, test_user["id"]
     )
     result = await db_session.execute(
         select(MembershipRequests).where(MembershipRequests.id == membership_id)
     )
     membership_request = result.scalar_one()
-    assert membership_request.type == "invitation"
-    assert membership_request.from_id == test_company
-    assert membership_request.to_id == test_user["id"]
+    assert membership_request.type == "invite"
+    assert membership_request.company_id == test_company
+    assert membership_request.user_id == test_user["id"]
 
     membership_id = await membership_services_fixture.send_membership_request(
         "request", test_company, test_user["id"]
@@ -27,8 +27,8 @@ async def test_send_membership_request(
     )
     membership_request = result.scalar_one()
     assert membership_request.type == "request"
-    assert membership_request.from_id == test_user["id"]
-    assert membership_request.to_id == test_company
+    assert membership_request.user_id == test_user["id"]
+    assert membership_request.company_id == test_company
 
 
 @pytest.mark.asyncio
@@ -36,7 +36,7 @@ async def test_cancel_membership_request(
     db_session, membership_services_fixture, test_membership_request
 ):
     await membership_services_fixture.cancel_membership_request(
-        test_membership_request["id"]
+        test_membership_request["user_id"], test_membership_request["company_id"]
     )
     result = await db_session.execute(
         select(MembershipRequests).where(
@@ -52,7 +52,9 @@ async def test_accept_membership_request(
     db_session, membership_services_fixture, test_membership_request
 ):
     membership_id = await membership_services_fixture.accept_membership_request(
-        test_membership_request["id"]
+        "request",
+        test_membership_request["user_id"],
+        test_membership_request["company_id"],
     )
     result = await db_session.execute(
         select(MembershipRequests).where(
@@ -110,25 +112,25 @@ async def test_get_membership_requests_for_user(
     assert len(membership_requests.items) >= 1
     membership_requests = (
         await membership_services_fixture.get_membership_requests_for_user(
-            "invites", test_membership_request["user_id"], limit=5, offset=0
+            "invite", test_membership_request["user_id"], limit=5, offset=0
         )
     )
     assert len(membership_requests.items) == 0
 
 
 @pytest.mark.asyncio
-async def test_get_membership_requests_for_owner(
+async def test_get_membership_requests_to_company(
     membership_services_fixture, test_membership_request
 ):
     membership_requests = (
-        await membership_services_fixture.get_membership_requests_for_owner(
-            "request", test_membership_request["user_id"], limit=5, offset=0
+        await membership_services_fixture.get_membership_requests_to_company(
+            "request", test_membership_request["company_id"], limit=5, offset=0
         )
     )
     assert len(membership_requests.items) >= 1
     membership_requests = (
-        await membership_services_fixture.get_membership_requests_for_user(
-            "invites", test_membership_request["user_id"], limit=5, offset=0
+        await membership_services_fixture.get_membership_requests_to_company(
+            "invite", test_membership_request["company_id"], limit=5, offset=0
         )
     )
     assert len(membership_requests.items) == 0
