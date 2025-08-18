@@ -36,7 +36,7 @@ async def test_cancel_membership_request(
     db_session, membership_services_fixture, test_membership_request
 ):
     await membership_services_fixture.cancel_membership_request(
-        test_membership_request["id"]
+        test_membership_request["user_id"], test_membership_request["company_id"]
     )
     result = await db_session.execute(
         select(MembershipRequests).where(
@@ -52,7 +52,9 @@ async def test_accept_membership_request(
     db_session, membership_services_fixture, test_membership_request
 ):
     membership_id = await membership_services_fixture.accept_membership_request(
-        test_membership_request["id"]
+        "request",
+        test_membership_request["user_id"],
+        test_membership_request["company_id"],
     )
     result = await db_session.execute(
         select(MembershipRequests).where(

@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, func, and_, Select
 
+from app.core.enums.role_enum import RoleEnum
 from app.models.user_model import User
 from app.models.membership_model import Memberships
 from app.schemas.user import (
@@ -100,7 +101,7 @@ class UserRepository(BaseRepository[User]):
 
         return await self.return_members(query)
 
-    async def get_users_by_ids(self, ids: list):
+    async def get_users_by_ids(self, ids: list[int]):
         if not ids:
             return ListResponse[UserDetailResponse](items=[], count=0)
         query = select(User, func.count().over().label("total_count")).where(
@@ -135,7 +136,9 @@ class UserRepository(BaseRepository[User]):
             select(User, Memberships.role, func.count().over().label("total_count"))
             .join(
                 Memberships,
-                and_(User.id == Memberships.user_id, Memberships.role == "ADMIN"),
+                and_(
+                    User.id == Memberships.user_id, Memberships.role == RoleEnum.ADMIN
+                ),
             )
             .filter(Memberships.company_id == company_id)
             .limit(limit or 5)

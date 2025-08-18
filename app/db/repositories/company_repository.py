@@ -78,7 +78,7 @@ class CompanyRepository(BaseRepository[Company]):
 
         return ListResponse[CompanyDetailResponse](items=items, count=total_count)
 
-    async def get_companies_by_ids(self, ids: list):
+    async def get_companies_by_ids(self, ids: list[int]):
         if not ids:
             return ListResponse[CompanyDetailResponse](items=[], count=0)
         query = select(Company, func.count().over().label("total_count")).where(

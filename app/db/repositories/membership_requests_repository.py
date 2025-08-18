@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, delete
 
 from app.db.repositories.base_repository import BaseRepository
 from app.models.membership_model import MembershipRequests
@@ -13,7 +13,7 @@ class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
         super().__init__(session, MembershipRequests)
 
     async def get_membership_request(
-        self, request_type: str, user_id: int, company_id: int
+        self, request_type: str, company_id: int, user_id: int
     ):
         result = await self.session.execute(
             select(MembershipRequests).where(
@@ -25,6 +25,13 @@ class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
             )
         )
         return result.scalar_one_or_none()
+
+    async def delete_membership_request(self, user_id: int, company_id: int):
+        await self.session.execute(
+            delete(MembershipRequests).where(
+                and_(user_id == user_id, company_id == company_id)
+            )
+        )
 
     async def get_membership_requests_for_user(
         self,

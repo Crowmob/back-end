@@ -1,16 +1,9 @@
-import enum
-
 from sqlalchemy import Enum
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import Integer, String, ForeignKey
+from sqlalchemy import String, ForeignKey
 
 from app.models.base import Base, IDMixin, TimestampMixin
-
-
-class RoleEnum(enum.Enum):
-    MEMBER = "MEMBER"
-    ADMIN = "ADMIN"
-    OWNER = "OWNER"
+from app.core.enums.role_enum import RoleEnum
 
 
 class Memberships(Base, IDMixin, TimestampMixin):

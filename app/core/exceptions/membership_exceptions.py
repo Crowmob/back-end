@@ -6,9 +6,9 @@ class AppException(HTTPException):
         super().__init__(status_code=status_code, detail=detail)
 
 
-class MembershipRequestWithIdNotFoundException(AppException):
-    def __init__(self, request_id: int):
+class MembershipRequestNotFoundException(AppException):
+    def __init__(self):
         super().__init__(
-            detail=f"Membership request with ID {request_id} not found",
+            detail=f"Membership request not found",
             status_code=status.HTTP_404_NOT_FOUND,
         )

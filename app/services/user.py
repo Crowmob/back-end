@@ -54,20 +54,6 @@ class UserServices:
 
                 user_id = user.id
 
-            if auth_provider and oauth_id:
-                exists = await uow.users.identity_exists(oauth_id)
-                if exists:
-                    logger.warning(
-                        f"Identity for provider {auth_provider} already exists."
-                    )
-                else:
-                    await uow.users.create_identity(
-                        user_id=user_id,
-                        provider=auth_provider,
-                        provider_id=oauth_id,
-                    )
-                    logger.info(f"Created identity for provider {auth_provider}")
-
             return user_id
 
     @staticmethod
@@ -153,7 +139,9 @@ class UserServices:
                     username=username,
                     password=password,
                     about=about,
-                    avatar_ext=ext if ext else user.avatar,
+                    avatar_ext=ext
+                    if ext
+                    else (user.avatar.split(".")[-1] if user.avatar else None),
                 )
                 await uow.users.update(
                     user_id,

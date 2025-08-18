@@ -16,11 +16,21 @@ class MembershipSchema(BaseModel):
     company_id: int
 
 
+class GetMembershipRequest(BaseModel):
+    user_id: int
+    company_id: int
+
+
 class MembershipRequestDetailResponse(IDMixin, TimestampMixin, BaseModel):
     request_type: str = Field(..., alias="type")
     company_id: int
     user_id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+class CancelMembershipRequest(BaseModel):
+    user_id: int
+    company_id: int
 
 
 class MembershipDetailResponse(IDMixin, TimestampMixin, BaseModel):
@@ -32,6 +42,12 @@ class MembershipDetailResponse(IDMixin, TimestampMixin, BaseModel):
 
 class GetUserMembershipRequests(PaginationMixin, BaseModel):
     request_type: str
+    user_id: int
+
+
+class AcceptMembershipRequest(BaseModel):
+    request_type: str
+    company_id: int
     user_id: int
 
 
