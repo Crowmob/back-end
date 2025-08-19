@@ -2,7 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.routers.admin_router import admin_router
 from app.routers.main_router import main_router
+from app.routers.quiz_router import quiz_router
 from app.routers.user_router import user_router
 from app.routers.basic_auth_router import basic_auth_router
 from app.routers.auth_router import auth_router
@@ -29,6 +31,8 @@ app.include_router(auth_router)
 app.include_router(basic_auth_router)
 app.include_router(company_router)
 app.include_router(membership_router)
+app.include_router(admin_router)
+app.include_router(quiz_router)
 
 if __name__ == "__main__":
     import uvicorn

@@ -58,13 +58,6 @@ async def get_users_in_company(data: GetUsersInCompanyRequest = Depends()):
     )
 
 
-@membership_router.get("/admins", response_model=ListResponse[MemberDetailResponse])
-async def get_all_admins(data: GetAllAdminsRequest = Depends()):
-    return await membership_services.get_all_admins(
-        data.company_id, data.limit, data.offset
-    )
-
-
 @membership_router.post("/request", response_model=ResponseModel)
 async def send_membership_request(data: SendMembershipRequest = Body(...)):
     await membership_services.send_membership_request(
