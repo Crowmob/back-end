@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete, func
+from sqlalchemy import update, delete, func, and_, or_
 
 from app.models.company_model import Company
 from app.models.membership_model import Memberships
@@ -17,12 +17,44 @@ class CompanyRepository(BaseRepository[Company]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, Company)
 
-    async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
-        items, total_count = await super().get_all(
-            filters={},
-            limit=limit,
-            offset=offset,
-        )
+    async def get_all_companies(
+        self,
+        limit: int | None = 5,
+        offset: int | None = 0,
+        current_user: int | None = None,
+    ):
+        if not current_user:
+            items, total_count = await super().get_all(
+                filters={"private": False},
+                limit=limit,
+                offset=offset,
+            )
+        else:
+            query = select(Company, func.count().over().label("total_count"))
+            query = (
+                query.where(
+                    (Company.private == False) | (Company.owner == current_user)
+                )
+                .offset(offset or 0)
+                .limit(limit or 5)
+            )
+            result = await self.session.execute(query)
+            rows = result.all()
+
+            if not rows:
+                return ListResponse[CompanyDetailResponse](items=[], count=0)
+
+            total_count = rows[0].total_count
+            items = [
+                CompanyDetailResponse(
+                    id=company.id,
+                    owner=company.owner,
+                    name=company.name,
+                    description=company.description,
+                    private=company.private,
+                )
+                for company, _ in rows
+            ]
         return ListResponse[CompanyDetailResponse](
             items=[
                 CompanyDetailResponse(
@@ -91,3 +123,20 @@ class CompanyRepository(BaseRepository[Company]):
             ],
             count=total_count,
         )
+
+    async def get_company_by_id(self, company_id: int, current_user: int):
+        query = (
+            select(Company)
+            .join(Memberships, Company.id == Memberships.company_id, isouter=True)
+            .where(
+                and_(
+                    Company.id == company_id,
+                    or_(
+                        Company.private == False,
+                        Memberships.user_id == current_user,
+                    ),
+                )
+            )
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()

@@ -16,17 +16,30 @@ company_router = APIRouter(tags=["Company"], prefix="/company")
 
 
 @company_router.get("/", response_model=ListResponse[CompanyDetailResponse])
-async def get_all_companies(data: GetAllCompaniesRequest = Depends()):
-    return await company_services.get_all_companies(data.limit, data.offset)
+async def get_all_companies(
+    data: GetAllCompaniesRequest = Depends(), authorization: str = Header(None)
+):
+    user_id = None
+    if authorization:
+        token = authorization.removeprefix("Bearer ")
+        token_data = await token_services.get_data_from_token(token)
+        user = await user_services.get_user_by_email(
+            token_data["http://localhost:8000/email"]
+        )
+        user_id = user.id
+    return await company_services.get_all_companies(data.limit, data.offset, user_id)
 
 
 @company_router.get("/{company_id}", response_model=CompanyDetailResponse)
 async def get_company_by_id(company_id: int, authorization: str = Header(...)):
     token = authorization.removeprefix("Bearer ")
-    company = await company_services.get_company_by_id(company_id)
     token_data = await token_services.get_data_from_token(token)
+    current_user = await user_services.get_user_by_email(
+        token_data["http://localhost:8000/email"]
+    )
+    company = await company_services.get_company_by_id(company_id, current_user.id)
     owner = await user_services.get_user_by_id(company.owner)
-    if token_data["http://localhost:8000/email"] == owner.email:
+    if current_user.email == owner.email:
         company.is_owner = True
     return company
 
@@ -40,14 +53,32 @@ async def create_company(data: CompanySchema = Body()):
 
 
 @company_router.put("/{company_id}", response_model=ResponseModel)
-async def update_company(company_id: int, data: CompanyUpdateRequestModel = Body()):
+async def update_company(
+    company_id: int,
+    data: CompanyUpdateRequestModel = Body(),
+    authorization: str = Header(...),
+):
+    token = authorization.removeprefix("Bearer ")
+    token_data = await token_services.get_data_from_token(token)
+    current_user = await user_services.get_user_by_email(
+        token_data["http://localhost:8000/email"]
+    )
     await company_services.update_company(
-        company_id, data.name, data.description, data.private
+        company_id,
+        data.name,
+        data.description,
+        data.private,
+        current_user=current_user.id,
     )
     return ResponseModel(status_code=200, message="Company updated successfully")
 
 
 @company_router.delete("/{company_id}", response_model=ResponseModel)
-async def delete_company(company_id: int):
-    await company_services.delete_company(company_id)
+async def delete_company(company_id: int, authorization: str = Header(...)):
+    token = authorization.removeprefix("Bearer ")
+    token_data = await token_services.get_data_from_token(token)
+    current_user = await user_services.get_user_by_email(
+        token_data["http://localhost:8000/email"]
+    )
+    await company_services.delete_company(company_id, current_user.id)
     return ResponseModel(status_code=200, message="Company deleted successfully")
