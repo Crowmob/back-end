@@ -5,15 +5,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.exceptions.quiz_exceptions import QuizException, NotFoundByIdException
 from app.db.unit_of_work import UnitOfWork
 from app.schemas.quiz import (
-    Quiz,
-    Answer,
-    Question,
-    CreateQuestionSchema,
-    CreateQuizSchema,
-    CreateAnswerSchema,
-    QuizUpdateModel,
-    QuestionUpdateModel,
-    AnswerUpdateModel,
+    QuizWithQuestionsSchema,
+    QuestionCreateSchema,
+    QuizCreateSchema,
+    AnswerCreateSchema,
+    QuizUpdateSchema,
+    QuestionUpdateSchema,
+    AnswerUpdateSchema,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,38 +19,40 @@ logger = logging.getLogger(__name__)
 
 class QuizServices:
     @staticmethod
-    async def create_quiz(company_id: int, quiz: Quiz):
+    async def create_quiz(company_id: int, quiz: QuizWithQuestionsSchema):
         async with UnitOfWork() as uow:
-            if len(quiz.questions) < 2:
-                raise QuizException(detail="Quiz should have at least 2 questions")
             try:
                 quiz_id = await uow.quizzes.create(
-                    CreateQuizSchema(
+                    QuizCreateSchema(
                         title=quiz.title,
                         description=quiz.description,
                         company_id=company_id,
                     ).model_dump()
                 )
-                for question in quiz.questions:
-                    if 2 > len(question.answers) > 4:
-                        raise QuizException(
-                            detail="Questions should have at least 2 answers"
-                        )
-                    question_id = await uow.questions.create(
-                        CreateQuestionSchema(
-                            text=question.text, quiz_id=quiz_id
-                        ).model_dump()
-                    )
+
+                questions_data = [
+                    QuestionCreateSchema(
+                        text=question.text, quiz_id=quiz_id
+                    ).model_dump()
+                    for question in quiz.questions
+                ]
+                question_ids = await uow.questions.create_many(questions_data)
+
+                answers_data = []
+                for question, question_id in zip(quiz.questions, question_ids):
                     for answer in question.answers:
-                        await uow.answers.create(
-                            CreateAnswerSchema(
+                        answers_data.append(
+                            AnswerCreateSchema(
                                 text=answer.text,
-                                question_id=question_id,
                                 is_correct=answer.is_correct,
+                                question_id=question_id,
                             ).model_dump()
                         )
+                await uow.answers.create_many(answers_data)
+
                 logger.info(f"Created quiz id: {quiz_id}")
                 return quiz_id
+
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise
@@ -99,7 +99,7 @@ class QuizServices:
                     raise NotFoundByIdException(
                         detail=f"Quiz with ID {quiz_id} not found"
                     )
-                update_model = QuizUpdateModel(
+                update_model = QuizUpdateSchema(
                     title=title,
                     description=description,
                 )
@@ -117,7 +117,7 @@ class QuizServices:
                     raise NotFoundByIdException(
                         detail=f"Question with id {question_id} not found"
                     )
-                update_model = QuestionUpdateModel(text=text)
+                update_model = QuestionUpdateSchema(text=text)
                 await uow.questions.update(question_id, update_model.model_dump())
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
@@ -134,7 +134,7 @@ class QuizServices:
                     raise NotFoundByIdException(
                         detail=f"Answer with id {answer_id} not found"
                     )
-                update_model = AnswerUpdateModel(
+                update_model = AnswerUpdateSchema(
                     text=text,
                     is_correct=is_correct,
                 )

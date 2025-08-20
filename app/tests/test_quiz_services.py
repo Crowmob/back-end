@@ -1,32 +1,32 @@
 import pytest
 from sqlalchemy import select
 
-from app.schemas.quiz import Quiz, Question, Answer
-from app.models.quiz_model import (
-    Quiz as QuizModel,
-    Question as QuestionModel,
-    Answer as AnswerModel,
+from app.schemas.quiz import (
+    AnswerSchema,
+    QuestionWithAnswersSchema,
+    QuizWithQuestionsSchema,
 )
+from app.models.quiz_model import Quiz, Question, Answer
 
 
 @pytest.mark.asyncio
 async def test_create_quiz(db_session, quiz_services_fixture, test_company):
-    quiz1 = Quiz(
+    quiz1 = QuizWithQuestionsSchema(
         title="Test Quiz",
         description="Test description",
         questions=[
-            Question(
+            QuestionWithAnswersSchema(
                 text="Test text",
                 answers=[
-                    Answer(text="Test answer", is_correct=True),
-                    Answer(text="Test answer2", is_correct=False),
+                    AnswerSchema(text="Test answer", is_correct=True),
+                    AnswerSchema(text="Test answer2", is_correct=False),
                 ],
             ),
-            Question(
+            QuestionWithAnswersSchema(
                 text="Test text",
                 answers=[
-                    Answer(text="Test answer", is_correct=True),
-                    Answer(text="Test answer2", is_correct=False),
+                    AnswerSchema(text="Test answer", is_correct=True),
+                    AnswerSchema(text="Test answer2", is_correct=False),
                 ],
             ),
         ],
@@ -71,9 +71,7 @@ async def test_update_quiz(db_session, quiz_services_fixture, test_quiz):
     await quiz_services_fixture.update_quiz(
         quiz_id=test_quiz["id"], title="Test Title 2", description="Test Description 2"
     )
-    quiz = await db_session.scalar(
-        select(QuizModel).where(QuizModel.id == test_quiz["id"])
-    )
+    quiz = await db_session.scalar(select(Quiz).where(Quiz.id == test_quiz["id"]))
     assert quiz.title == "Test Title 2"
     assert quiz.description == "Test Description 2"
 
@@ -84,7 +82,7 @@ async def test_update_question(db_session, quiz_services_fixture, test_questions
         question_id=test_questions["id1"], text="Test text 2"
     )
     question = await db_session.scalar(
-        select(QuestionModel).where(QuestionModel.id == test_questions["id1"])
+        select(Question).where(Question.id == test_questions["id1"])
     )
     assert question.text == "Test text 2"
 
@@ -95,7 +93,7 @@ async def test_update_answer(db_session, quiz_services_fixture, test_answers):
         answer_id=test_answers["id1"], text="Test text 2", is_correct=False
     )
     answer = await db_session.scalar(
-        select(AnswerModel).where(AnswerModel.id == test_answers["id1"])
+        select(Answer).where(Answer.id == test_answers["id1"])
     )
     assert answer.text == "Test text 2"
     assert not answer.is_correct
@@ -107,13 +105,11 @@ async def test_delete_quiz(
 ):
     await quiz_services_fixture.delete_quiz(quiz_id=test_quiz["id"])
 
-    quiz = await db_session.scalar(
-        select(QuizModel).where(QuizModel.id == test_quiz["id"])
-    )
+    quiz = await db_session.scalar(select(Quiz).where(Quiz.id == test_quiz["id"]))
     assert quiz is None
     for question_id in [test_questions["id1"], test_questions["id2"]]:
         question = await db_session.scalar(
-            select(QuestionModel).where(QuestionModel.id == question_id)
+            select(Question).where(Question.id == question_id)
         )
         assert question is None
     for answer_id in [
@@ -122,9 +118,7 @@ async def test_delete_quiz(
         test_answers["id3"],
         test_answers["id4"],
     ]:
-        answer = await db_session.scalar(
-            select(AnswerModel).where(AnswerModel.id == answer_id)
-        )
+        answer = await db_session.scalar(select(Answer).where(Answer.id == answer_id))
         assert answer is None
 
 
@@ -135,7 +129,7 @@ async def test_delete_question(
     for question_id in [test_questions["id1"], test_questions["id2"]]:
         await quiz_services_fixture.delete_question(question_id=question_id)
         question = await db_session.scalar(
-            select(QuestionModel).where(QuestionModel.id == question_id)
+            select(Question).where(Question.id == question_id)
         )
         assert question is None
     for answer_id in [
@@ -144,9 +138,7 @@ async def test_delete_question(
         test_answers["id3"],
         test_answers["id4"],
     ]:
-        answer = await db_session.scalar(
-            select(AnswerModel).where(AnswerModel.id == answer_id)
-        )
+        answer = await db_session.scalar(select(Answer).where(Answer.id == answer_id))
         assert answer is None
 
 
@@ -159,7 +151,5 @@ async def test_delete_answer(db_session, quiz_services_fixture, test_answers):
         test_answers["id4"],
     ]:
         await quiz_services_fixture.delete_answer(answer_id=answer_id)
-        answer = await db_session.scalar(
-            select(AnswerModel).where(AnswerModel.id == answer_id)
-        )
+        answer = await db_session.scalar(select(Answer).where(Answer.id == answer_id))
         assert answer is None

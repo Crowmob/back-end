@@ -29,7 +29,10 @@ class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
     async def delete_membership_request(self, user_id: int, company_id: int):
         await self.session.execute(
             delete(MembershipRequests).where(
-                and_(user_id == user_id, company_id == company_id)
+                and_(
+                    MembershipRequests.user_id == user_id,
+                    MembershipRequests.company_id == company_id,
+                )
             )
         )
 
@@ -40,36 +43,23 @@ class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
         limit: int | None = None,
         offset: int | None = None,
     ):
-        query = (
-            select(MembershipRequests, func.count().over().label("total_count"))
-            .where(
-                and_(
-                    MembershipRequests.type == request_type,
-                    MembershipRequests.user_id == user_id,
-                )
-            )
-            .offset(offset or 0)
-            .limit(limit or 5)
+        items, total_count = await super().get_all(
+            filters={"type": request_type, "user_id": user_id},
+            limit=limit,
+            offset=offset,
         )
 
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return ListResponse[MembershipRequestDetailResponse](items=[], count=0)
-
-        total_count = rows[0][1]
-        items = [
-            MembershipRequestDetailResponse(
-                id=request.id,
-                type=request.type,
-                company_id=request.company_id,
-                user_id=request.user_id,
-            )
-            for request, _ in rows
-        ]
         return ListResponse[MembershipRequestDetailResponse](
-            items=items, count=total_count
+            items=[
+                MembershipRequestDetailResponse(
+                    id=request.id,
+                    type=request.type,
+                    company_id=request.company_id,
+                    user_id=request.user_id,
+                )
+                for request in items
+            ],
+            count=total_count,
         )
 
     async def get_membership_requests_to_company(

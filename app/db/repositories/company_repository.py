@@ -18,32 +18,24 @@ class CompanyRepository(BaseRepository[Company]):
         super().__init__(session, Company)
 
     async def get_all_companies(self, limit: int | None = 5, offset: int | None = 0):
-        query = (
-            select(Company, func.count().over().label("total_count"))
-            .offset(offset or 0)
-            .limit(limit or 10)
+        items, total_count = await super().get_all(
+            filters={},
+            limit=limit,
+            offset=offset,
         )
-
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return ListResponse[CompanyDetailResponse](items=[], count=0)
-
-        total_count = rows[0].total_count
-
-        items = [
-            CompanyDetailResponse(
-                id=row.id,
-                owner=row.owner,
-                name=row.name,
-                description=row.description,
-                private=row.private,
-            )
-            for row, _ in rows
-        ]
-
-        return ListResponse[CompanyDetailResponse](items=items, count=total_count)
+        return ListResponse[CompanyDetailResponse](
+            items=[
+                CompanyDetailResponse(
+                    id=company.id,
+                    owner=company.owner,
+                    name=company.name,
+                    description=company.description,
+                    private=company.private,
+                )
+                for company in items
+            ],
+            count=total_count,
+        )
 
     async def get_companies_for_user(
         self, user_id: int, limit: int | None = None, offset: int | None = None
@@ -81,23 +73,21 @@ class CompanyRepository(BaseRepository[Company]):
     async def get_companies_by_ids(self, ids: list[int]):
         if not ids:
             return ListResponse[CompanyDetailResponse](items=[], count=0)
-        query = select(Company, func.count().over().label("total_count")).where(
-            Company.id.in_(ids)
+        items, total_count = await super().get_all(
+            filters={"id": ids} if ids else {},
+            limit=None,
+            offset=None,
         )
-
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        total_count = rows[0][1]
-
-        items = [
-            CompanyDetailResponse(
-                id=company.id,
-                owner=company.owner,
-                name=company.name,
-                description=company.description,
-                private=company.private,
-            )
-            for company, _ in rows
-        ]
-        return ListResponse[CompanyDetailResponse](items=items, count=total_count)
+        return ListResponse[CompanyDetailResponse](
+            items=[
+                CompanyDetailResponse(
+                    id=company.id,
+                    owner=company.owner,
+                    name=company.name,
+                    description=company.description,
+                    private=company.private,
+                )
+                for company in items
+            ],
+            count=total_count,
+        )

@@ -3,10 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.base_repository import BaseRepository
 from app.models.quiz_model import Answer
-from app.schemas.quiz import AnswerSchema
+from app.schemas.quiz import AnswerDetailResponse
 
 
-class AnswerRepository(BaseRepository[AnswerSchema]):
+class AnswerRepository(BaseRepository[Answer]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, Answer)
 
@@ -16,4 +16,4 @@ class AnswerRepository(BaseRepository[AnswerSchema]):
         )
         rows = result.scalars().all()
 
-        return [AnswerSchema.model_validate(row) for row in rows]
+        return [AnswerDetailResponse.model_validate(row) for row in rows]
