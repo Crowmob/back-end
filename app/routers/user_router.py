@@ -17,7 +17,7 @@ async def get_user_by_id_endpoint(user_id: int, authorization: str = Header(...)
     token = authorization.removeprefix("Bearer ")
     data = await token_services.get_data_from_token(token)
     user_data = await user_services.get_user_by_id(user_id)
-    if data["http://localhost:8000/email"] == user_data.email:
+    if data["email"] == user_data.email:
         user_data.current_user = True
     return user_data
 
