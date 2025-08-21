@@ -4,10 +4,6 @@ from app.core.exceptions.quiz_exceptions import QuizException
 from app.schemas.base import TimestampMixin, IDMixin
 
 
-from pydantic import BaseModel, ConfigDict
-from app.schemas.base import TimestampMixin, IDMixin
-
-
 class QuizSchema(BaseModel):
     title: str
     description: str

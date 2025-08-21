@@ -23,9 +23,7 @@ async def get_all_companies(
     if authorization:
         token = authorization.removeprefix("Bearer ")
         token_data = await token_services.get_data_from_token(token)
-        user = await user_services.get_user_by_email(
-            token_data["http://localhost:8000/email"]
-        )
+        user = await user_services.get_user_by_email(token_data["email"])
         user_id = user.id
     return await company_services.get_all_companies(data.limit, data.offset, user_id)
 
@@ -34,9 +32,7 @@ async def get_all_companies(
 async def get_company_by_id(company_id: int, authorization: str = Header(...)):
     token = authorization.removeprefix("Bearer ")
     token_data = await token_services.get_data_from_token(token)
-    current_user = await user_services.get_user_by_email(
-        token_data["http://localhost:8000/email"]
-    )
+    current_user = await user_services.get_user_by_email(token_data["email"])
     company = await company_services.get_company_by_id(company_id, current_user.id)
     owner = await user_services.get_user_by_id(company.owner)
     if current_user.email == owner.email:
@@ -60,9 +56,7 @@ async def update_company(
 ):
     token = authorization.removeprefix("Bearer ")
     token_data = await token_services.get_data_from_token(token)
-    current_user = await user_services.get_user_by_email(
-        token_data["http://localhost:8000/email"]
-    )
+    current_user = await user_services.get_user_by_email(token_data["email"])
     await company_services.update_company(
         company_id,
         data.name,
@@ -77,8 +71,6 @@ async def update_company(
 async def delete_company(company_id: int, authorization: str = Header(...)):
     token = authorization.removeprefix("Bearer ")
     token_data = await token_services.get_data_from_token(token)
-    current_user = await user_services.get_user_by_email(
-        token_data["http://localhost:8000/email"]
-    )
+    current_user = await user_services.get_user_by_email(token_data["email"])
     await company_services.delete_company(company_id, current_user.id)
     return ResponseModel(status_code=200, message="Company deleted successfully")
