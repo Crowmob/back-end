@@ -53,6 +53,9 @@ class Auth0UserServices:
         return response.json()
 
     async def register_user(self, username: str, email: str, password: str):
+        user = await user_services.get_user_by_email(email)
+        if user:
+            return {"message": "invalid_signup"}
         url = f"https://{settings.auth.AUTH0_DOMAIN}/dbconnections/signup"
         payload = {
             "client_id": settings.auth.CLIENT_ID,

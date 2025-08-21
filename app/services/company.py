@@ -36,10 +36,16 @@ class CompanyServices:
             return company_id
 
     @staticmethod
-    async def get_all_companies(limit: int | None = None, offset: int | None = None):
+    async def get_all_companies(
+        limit: int | None = None,
+        offset: int | None = None,
+        current_user: int | None = None,
+    ):
         async with UnitOfWork() as uow:
             try:
-                companies = await uow.companies.get_all_companies(limit, offset)
+                companies = await uow.companies.get_all_companies(
+                    limit, offset, current_user
+                )
                 logger.info("Fetched companies")
                 logger.info(companies)
                 return companies
@@ -48,9 +54,11 @@ class CompanyServices:
                 raise
 
     @staticmethod
-    async def get_company_by_id_with_uow(company_id: int, uow: UnitOfWork):
+    async def get_company_by_id_with_uow(
+        company_id: int, uow: UnitOfWork, current_user: int
+    ):
         try:
-            company = await uow.companies.get_by_id(company_id)
+            company = await uow.companies.get_company_by_id(company_id, current_user)
             if not company:
                 logger.warning(f"No company found with id={company_id}")
                 raise CompanyWithIdNotFoundException(company_id)
@@ -61,9 +69,9 @@ class CompanyServices:
             logger.info(f"SQLAlchemy error: {e}")
             raise
 
-    async def get_company_by_id(self, company_id: int):
+    async def get_company_by_id(self, company_id: int, current_user: int):
         async with UnitOfWork() as uow:
-            return await self.get_company_by_id_with_uow(company_id, uow)
+            return await self.get_company_by_id_with_uow(company_id, uow, current_user)
 
     async def update_company(
         self,
@@ -71,9 +79,10 @@ class CompanyServices:
         name: str | None = None,
         description: str | None = None,
         private: bool | None = True,
+        current_user: int | None = None,
     ):
         async with UnitOfWork() as uow:
-            await self.get_company_by_id_with_uow(company_id, uow)
+            await self.get_company_by_id_with_uow(company_id, uow, current_user)
             try:
                 update_model = CompanyUpdateRequestModel(
                     name=name, description=description, private=private
@@ -93,9 +102,9 @@ class CompanyServices:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise AppException(detail="Database exception occurred.")
 
-    async def delete_company(self, company_id: int):
+    async def delete_company(self, company_id: int, current_user: int):
         async with UnitOfWork() as uow:
-            await self.get_company_by_id_with_uow(company_id, uow)
+            await self.get_company_by_id_with_uow(company_id, uow, current_user)
             try:
                 await uow.companies.delete(company_id)
                 logger.info(f"Company deleted: id={company_id}")

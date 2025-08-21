@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy import insert
 
 from app.models.company_model import Company
+from app.models.quiz_model import Answer, Question, Quiz
+from app.services.quiz import quiz_services
 from app.services.user import user_services
 from app.services.company import company_services
 from app.db.unit_of_work import UnitOfWork
@@ -62,6 +64,15 @@ def admin_services_fixture(db_session, monkeypatch):
 
     monkeypatch.setattr("app.services.admin.UnitOfWork", unit_of_work_with_session)
     return admin_services
+
+
+@pytest.fixture
+def quiz_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr("app.services.quiz.UnitOfWork", unit_of_work_with_session)
+    return quiz_services
 
 
 @pytest_asyncio.fixture
@@ -128,3 +139,72 @@ async def test_admin(db_session, test_user, test_company):
     membership_id = result.one()[0]
     await db_session.commit()
     return {"id": membership_id, "user_id": test_user["id"], "company_id": test_company}
+
+
+@pytest_asyncio.fixture
+async def test_answers(db_session, test_questions):
+    res = {}
+    for i in range(2):
+        result = await db_session.execute(
+            insert(Answer)
+            .values(
+                text="Test answer",
+                is_correct=True,
+                question_id=test_questions["id1" if i == 0 else "id2"],
+            )
+            .returning(Answer.id)
+        )
+        answer_id1 = result.one()[0]
+        result = await db_session.execute(
+            insert(Answer)
+            .values(
+                text="Test answer",
+                is_correct=False,
+                question_id=test_questions["id1" if i == 0 else "id2"],
+            )
+            .returning(Answer.id)
+        )
+        answer_id2 = result.one()[0]
+        res[f"id{i * 2 + 1}"] = answer_id1
+        res[f"id{i * 2 + 2}"] = answer_id2
+    res["question_id1"] = test_questions["id1"]
+    res["question_id2"] = test_questions["id2"]
+    return res
+
+
+@pytest_asyncio.fixture
+async def test_questions(db_session, test_quiz):
+    result = await db_session.execute(
+        insert(Question)
+        .values(
+            text="Test question",
+            quiz_id=test_quiz["id"],
+        )
+        .returning(Question.id)
+    )
+    question_id1 = result.one()[0]
+    result = await db_session.execute(
+        insert(Question)
+        .values(
+            text="Test question",
+            quiz_id=test_quiz["id"],
+        )
+        .returning(Question.id)
+    )
+    question_id2 = result.one()[0]
+    return {"quiz_id": test_quiz["id"], "id1": question_id1, "id2": question_id2}
+
+
+@pytest_asyncio.fixture
+async def test_quiz(db_session, test_company):
+    result = await db_session.execute(
+        insert(Quiz)
+        .values(
+            title="Test quiz",
+            description="Test quiz",
+            company_id=test_company,
+        )
+        .returning(Quiz.id)
+    )
+    quiz_id = result.one()[0]
+    return {"id": quiz_id, "company_id": test_company}

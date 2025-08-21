@@ -42,37 +42,29 @@ class UserRepository(BaseRepository[User]):
         return ListResponse[MemberDetailResponse](items=items, count=total_count)
 
     async def get_all_users(self, limit: int | None = None, offset: int | None = None):
-        query = (
-            select(User, func.count().over().label("total_count"))
-            .where(User.has_profile)
-            .offset(offset or 0)
-            .limit(limit or 10)
+        items, total_count = await super().get_all(
+            filters={"has_profile": True},
+            limit=limit,
+            offset=offset,
         )
 
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return ListResponse[UserDetailResponse](items=[], count=0)
-
-        total_count = rows[0].total_count
-
-        items = [
-            UserDetailResponse(
-                id=user.id,
-                username=user.username,
-                email=user.email,
-                about=user.about,
-                avatar=(
-                    f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
-                    if user.avatar_ext
-                    else None
-                ),
-            )
-            for user, _ in rows
-        ]
-
-        return ListResponse[UserDetailResponse](items=items, count=total_count)
+        return ListResponse[UserDetailResponse](
+            items=[
+                UserDetailResponse(
+                    id=user.id,
+                    username=user.username,
+                    email=user.email,
+                    about=user.about,
+                    avatar=(
+                        f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                        if user.avatar_ext
+                        else None
+                    ),
+                )
+                for user in items
+            ],
+            count=total_count,
+        )
 
     async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
         result = await self.session.execute(select(User).where(User.email == email))
@@ -104,30 +96,29 @@ class UserRepository(BaseRepository[User]):
     async def get_users_by_ids(self, ids: list[int]):
         if not ids:
             return ListResponse[UserDetailResponse](items=[], count=0)
-        query = select(User, func.count().over().label("total_count")).where(
-            User.id.in_(ids)
+        items, total_count = await super().get_all(
+            filters={"id": ids} if ids else {},
+            limit=None,
+            offset=None,
         )
 
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        total_count = rows[0][1]
-
-        items = [
-            UserDetailResponse(
-                id=user.id,
-                username=user.username,
-                email=user.email,
-                about=user.about,
-                avatar=(
-                    f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
-                    if user.avatar_ext
-                    else None
-                ),
-            )
-            for user, _ in rows
-        ]
-        return ListResponse[UserDetailResponse](items=items, count=total_count)
+        return ListResponse[UserDetailResponse](
+            items=[
+                UserDetailResponse(
+                    id=user.id,
+                    username=user.username,
+                    email=user.email,
+                    about=user.about,
+                    avatar=(
+                        f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                        if user.avatar_ext
+                        else None
+                    ),
+                )
+                for user in items
+            ],
+            count=total_count,
+        )
 
     async def get_all_admins(
         self, company_id: int, limit: int | None = None, offset: int | None = None

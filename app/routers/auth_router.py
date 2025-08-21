@@ -23,7 +23,7 @@ async def auth_user(
     user_id, filepath = await auth0_user_services.auth_user(
         name,
         avatar,
-        data["http://localhost:8000/email"],
+        data["email"],
         data["sub"],
     )
     return ResponseModel(

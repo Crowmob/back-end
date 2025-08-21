@@ -32,5 +32,5 @@ async def get_me(authorization: str = Header(...)):
     data = await token_services.get_data_from_token(token)
     if not data:
         raise UnauthorizedException(detail="Invalid token.")
-    user = await basic_auth_services.get_me(data["http://localhost:8000/email"])
+    user = await basic_auth_services.get_me(data["email"])
     return MeResponseModel(status_code=200, me=user)
