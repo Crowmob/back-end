@@ -171,4 +171,20 @@ async def test_get_average_score_in_company(
     score = await quiz_services_fixture.get_average_score_in_company(
         user_id=test_user["id"], company_id=test_company["id"]
     )
-    assert score == 100
+    assert score == 50
+
+
+@pytest.mark.asyncio
+async def test_get_average_score_in_system(
+    test_user,
+    test_quiz,
+    test_questions,
+    test_answers,
+    test_participant,
+    test_record,
+    quiz_services_fixture,
+):
+    score = await quiz_services_fixture.get_average_score_in_system(
+        user_id=test_user["id"]
+    )
+    assert score == 50

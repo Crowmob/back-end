@@ -208,8 +208,24 @@ class QuizServices:
     @staticmethod
     async def get_average_score_in_company(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            score = await uow.records.get_average_score_in_company(user_id, company_id)
-            return score
+            try:
+                score = await uow.records.get_average_score_in_company(
+                    user_id, company_id
+                )
+                return score
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise
+
+    @staticmethod
+    async def get_average_score_in_system(user_id: int):
+        async with UnitOfWork() as uow:
+            try:
+                score = await uow.records.get_average_score_in_system(user_id)
+                return score
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise
 
 
 quiz_services = QuizServices()

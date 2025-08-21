@@ -233,7 +233,7 @@ async def test_participant(db_session, test_quiz, test_user):
 async def test_record(db_session, test_participant):
     result = await db_session.execute(
         insert(Records)
-        .values(participant_id=test_participant["id"], score=2)
+        .values(participant_id=test_participant["id"], score=1)
         .returning(Records.id)
     )
     record_id = result.one()[0]

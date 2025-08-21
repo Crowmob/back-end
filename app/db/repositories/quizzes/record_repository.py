@@ -10,13 +10,13 @@ class RecordsRepository(BaseRepository[Records]):
         super().__init__(session, Records)
 
     async def get_average_score_in_company(self, user_id: int, company_id: int):
-        total_questions_q = (
+        total_questions_query = (
             select(func.count(Question.id))
             .join(Quiz, Quiz.id == Question.quiz_id)
             .where(Quiz.company_id == company_id)
         ).scalar_subquery()
 
-        user_correct_q = (
+        user_correct_query = (
             select(func.coalesce(func.sum(Records.score), 0))
             .join(QuizParticipant, QuizParticipant.id == Records.participant_id)
             .join(Quiz, Quiz.id == QuizParticipant.quiz_id)
@@ -27,9 +27,25 @@ class RecordsRepository(BaseRepository[Records]):
         ).scalar_subquery()
 
         query = select(
-            (user_correct_q * 100 / func.nullif(total_questions_q, 0)).label(
-                "percentage"
-            )
+            (user_correct_query * 100 / func.nullif(total_questions_query, 0))
+        )
+
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none() or 0
+
+    async def get_average_score_in_system(self, user_id: int):
+        total_questions_query = select(func.count(Question.id)).scalar_subquery()
+
+        user_correct_query = (
+            select(func.coalesce(func.sum(Records.score), 0))
+            .join(QuizParticipant, QuizParticipant.id == Records.participant_id)
+            .join(Quiz, Quiz.id == QuizParticipant.quiz_id)
+            .where(QuizParticipant.user_id == user_id)
+            .scalar_subquery()
+        )
+
+        query = select(
+            (user_correct_query * 100 / func.nullif(total_questions_query, 0))
         )
 
         result = await self.session.execute(query)
