@@ -21,7 +21,11 @@ class QuestionRepository(BaseRepository[Question]):
 
         return ListResponse[QuestionDetailResponse](
             items=[
-                QuestionDetailResponse(id=question.id, text=question.text)
+                QuestionDetailResponse(
+                    id=question.id,
+                    text=question.text,
+                    correct_answers=question.correct_answers,
+                )
                 for question in items
             ],
             count=total_count,

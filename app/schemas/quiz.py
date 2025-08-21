@@ -1,10 +1,8 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.core.exceptions.quiz_exceptions import QuizException
-from app.schemas.base import TimestampMixin, IDMixin
-
-
-from pydantic import BaseModel, ConfigDict
 from app.schemas.base import TimestampMixin, IDMixin
 
 
@@ -15,6 +13,7 @@ class QuizSchema(BaseModel):
 
 class QuestionSchema(BaseModel):
     text: str
+    correct_answers: int
 
 
 class AnswerSchema(BaseModel):
@@ -22,9 +21,16 @@ class AnswerSchema(BaseModel):
     is_correct: bool
 
 
+class QuizParticipantSchema(BaseModel):
+    quiz_id: int
+    user_id: int
+    completed_at: datetime
+
+
 class QuestionWithAnswersSchema(BaseModel):
     text: str
     answers: list[AnswerSchema]
+    correct_answers: int
 
     @model_validator(mode="after")
     def validate_answers(self) -> "QuestionWithAnswersSchema":
@@ -47,28 +53,42 @@ class QuizWithQuestionsSchema(BaseModel):
         return self
 
 
-class AnswerDetailResponse(IDMixin, AnswerSchema):
+class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class QuestionDetailResponse(IDMixin, QuestionSchema):
-    answers: list[AnswerDetailResponse] | None = None
+class QuestionDetailResponse(IDMixin, QuestionSchema, BaseModel):
+    pass
 
 
-class QuizDetailResponse(IDMixin, TimestampMixin, QuizSchema):
-    questions: list[QuestionDetailResponse] | None = None
+class QuizDetailResponse(IDMixin, QuizSchema, BaseModel):
+    pass
 
 
-class QuizCreateSchema(QuizSchema):
+class QuizParticipantDetailResponse(IDMixin, QuizParticipantSchema, BaseModel):
+    pass
+
+
+class QuizCreateSchema(QuizSchema, BaseModel):
     company_id: int
 
 
-class QuestionCreateSchema(QuestionSchema):
+class QuestionCreateSchema(QuestionSchema, BaseModel):
     quiz_id: int
 
 
-class AnswerCreateSchema(AnswerSchema):
+class AnswerCreateSchema(AnswerSchema, BaseModel):
     question_id: int
+
+
+class QuizParticipantCreateSchema(BaseModel):
+    quiz_id: int
+    user_id: int
+
+
+class RecordCreateSchema(BaseModel):
+    participant_id: int
+    score: int
 
 
 class QuizUpdateSchema(BaseModel):
@@ -83,6 +103,10 @@ class QuestionUpdateSchema(BaseModel):
 class AnswerUpdateSchema(BaseModel):
     text: str | None = None
     is_correct: bool | None = None
+
+
+class QuizParticipantUpdateSchema(BaseModel):
+    completed_at: datetime | None = None
 
 
 class GetAllQuizzesRequest(BaseModel):

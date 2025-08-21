@@ -17,6 +17,7 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
         questions=[
             QuestionWithAnswersSchema(
                 text="Test text",
+                correct_answers=1,
                 answers=[
                     AnswerSchema(text="Test answer", is_correct=True),
                     AnswerSchema(text="Test answer2", is_correct=False),
@@ -24,6 +25,7 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
             ),
             QuestionWithAnswersSchema(
                 text="Test text",
+                correct_answers=1,
                 answers=[
                     AnswerSchema(text="Test answer", is_correct=True),
                     AnswerSchema(text="Test answer2", is_correct=False),
@@ -32,7 +34,7 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
         ],
     )
     quiz_id = await quiz_services_fixture.create_quiz(
-        company_id=test_company, quiz=quiz1
+        company_id=test_company["id"], quiz=quiz1
     )
     assert isinstance(quiz_id, int)
 
@@ -153,3 +155,20 @@ async def test_delete_answer(db_session, quiz_services_fixture, test_answers):
         await quiz_services_fixture.delete_answer(answer_id=answer_id)
         answer = await db_session.scalar(select(Answer).where(Answer.id == answer_id))
         assert answer is None
+
+
+@pytest.mark.asyncio
+async def test_get_average_score_in_company(
+    test_user,
+    test_company,
+    test_quiz,
+    test_questions,
+    test_answers,
+    test_participant,
+    test_record,
+    quiz_services_fixture,
+):
+    score = await quiz_services_fixture.get_average_score_in_company(
+        user_id=test_user["id"], company_id=test_company["id"]
+    )
+    assert score == 100
