@@ -139,4 +139,5 @@ class CompanyRepository(BaseRepository[Company]):
             )
         )
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        company = result.scalars().first()
+        return company

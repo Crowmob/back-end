@@ -17,7 +17,6 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
         questions=[
             QuestionWithAnswersSchema(
                 text="Test text",
-                correct_answers=1,
                 answers=[
                     AnswerSchema(text="Test answer", is_correct=True),
                     AnswerSchema(text="Test answer2", is_correct=False),
@@ -25,7 +24,6 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
             ),
             QuestionWithAnswersSchema(
                 text="Test text",
-                correct_answers=1,
                 answers=[
                     AnswerSchema(text="Test answer", is_correct=True),
                     AnswerSchema(text="Test answer2", is_correct=False),

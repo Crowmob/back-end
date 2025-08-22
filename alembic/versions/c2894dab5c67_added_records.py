@@ -30,12 +30,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_records_id"), "records", ["id"], unique=False)
-    op.add_column(
-        "questions", sa.Column("correct_answers", sa.Integer(), nullable=False)
-    )
 
 
 def downgrade() -> None:
-    op.drop_column("questions", "correct_answers")
     op.drop_index(op.f("ix_records_id"), table_name="records")
     op.drop_table("records")

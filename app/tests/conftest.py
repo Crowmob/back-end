@@ -187,13 +187,13 @@ async def test_answers(db_session, test_questions):
 async def test_questions(db_session, test_quiz):
     result = await db_session.execute(
         insert(Question)
-        .values(text="Test question", quiz_id=test_quiz["id"], correct_answers=1)
+        .values(text="Test question", quiz_id=test_quiz["id"])
         .returning(Question.id)
     )
     question_id1 = result.one()[0]
     result = await db_session.execute(
         insert(Question)
-        .values(text="Test question", quiz_id=test_quiz["id"], correct_answers=1)
+        .values(text="Test question", quiz_id=test_quiz["id"])
         .returning(Question.id)
     )
     question_id2 = result.one()[0]

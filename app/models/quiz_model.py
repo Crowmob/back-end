@@ -46,7 +46,6 @@ class Question(Base, IDMixin):
         ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False
     )
     text: Mapped[str] = mapped_column(String(512), nullable=False)
-    correct_answers: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class Answer(Base, IDMixin):

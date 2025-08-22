@@ -24,7 +24,6 @@ class QuestionRepository(BaseRepository[Question]):
                 QuestionDetailResponse(
                     id=question.id,
                     text=question.text,
-                    correct_answers=question.correct_answers,
                 )
                 for question in items
             ],

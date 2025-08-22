@@ -38,7 +38,6 @@ class QuizServices:
                     QuestionCreateSchema(
                         text=question.text,
                         quiz_id=quiz_id,
-                        correct_answers=question.correct_answers,
                     ).model_dump()
                     for question in quiz.questions
                 ]
@@ -192,12 +191,12 @@ class QuizServices:
                     )
                     logger.info(f"Created quiz participant")
                 else:
+                    participant_id = participant.id
                     await uow.participants.update(
                         QuizParticipantUpdateSchema(
                             completed_at=datetime.datetime.now()
                         )
                     )
-                    participant_id = await participant.id
                 await uow.records.create(
                     RecordCreateSchema(participant_id=participant_id, score=score)
                 )

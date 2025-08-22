@@ -13,7 +13,6 @@ class QuizSchema(BaseModel):
 
 class QuestionSchema(BaseModel):
     text: str
-    correct_answers: int
 
 
 class AnswerSchema(BaseModel):
@@ -27,10 +26,8 @@ class QuizParticipantSchema(BaseModel):
     completed_at: datetime
 
 
-class QuestionWithAnswersSchema(BaseModel):
-    text: str
+class QuestionWithAnswersSchema(QuestionSchema, BaseModel):
     answers: list[AnswerSchema]
-    correct_answers: int
 
     @model_validator(mode="after")
     def validate_answers(self) -> "QuestionWithAnswersSchema":
@@ -41,9 +38,7 @@ class QuestionWithAnswersSchema(BaseModel):
         return self
 
 
-class QuizWithQuestionsSchema(BaseModel):
-    title: str
-    description: str
+class QuizWithQuestionsSchema(QuizSchema, BaseModel):
     questions: list[QuestionWithAnswersSchema]
 
     @model_validator(mode="after")
