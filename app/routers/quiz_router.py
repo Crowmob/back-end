@@ -19,11 +19,8 @@ async def get_all_quizzes(data: GetAllQuizzesRequest = Depends()):
 
 
 @quiz_router.post("/{company_id}", response_model=ResponseModel)
-async def create_quiz(data: QuizWithQuestionsSchema = Body(...)):
-    import logging
-
-    logger = logging.getLogger(__name__)
-    logger.info(data)
+async def create_quiz(company_id: int, data: QuizWithQuestionsSchema = Body(...)):
+    await quiz_services.create_quiz(company_id, data)
     return ResponseModel(status_code=200, message="Created quiz")
 
 
