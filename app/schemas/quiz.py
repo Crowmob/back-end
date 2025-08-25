@@ -112,3 +112,19 @@ class GetAllQuizzesRequest(BaseModel):
 
 class AllQuizzesResponse(BaseModel):
     quizzes: list[QuizDetailResponse]
+
+
+class AnswerID(IDMixin, BaseModel):
+    is_correct: bool
+
+
+class QuestionID(IDMixin, BaseModel):
+    answers: list[AnswerID]
+
+
+class QuizSubmitRequest(BaseModel):
+    score: int
+    quiz_id: int
+    user_id: int
+    company_id: int
+    questions: list[QuestionID]

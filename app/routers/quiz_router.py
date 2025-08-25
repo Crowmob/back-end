@@ -4,6 +4,7 @@ from app.schemas.quiz import (
     GetAllQuizzesRequest,
     QuizDetailResponse,
     QuizWithQuestionsSchema,
+    QuizSubmitRequest,
 )
 from app.schemas.response_models import ListResponse, ResponseModel
 from app.services.quiz import quiz_services
@@ -18,6 +19,11 @@ async def get_all_quizzes(data: GetAllQuizzesRequest = Depends()):
     return await quiz_services.get_all_quizzes(data.company_id, data.limit, data.offset)
 
 
+@quiz_router.get("/{quiz_id}:{company_id}", response_model=QuizWithQuestionsSchema)
+async def get_quiz_by_id(quiz_id: int, company_id: int):
+    return await quiz_services.get_quiz_by_id(quiz_id, company_id)
+
+
 @quiz_router.post("/{company_id}", response_model=ResponseModel)
 async def create_quiz(company_id: int, data: QuizWithQuestionsSchema = Body(...)):
     await quiz_services.create_quiz(company_id, data)
@@ -25,10 +31,18 @@ async def create_quiz(company_id: int, data: QuizWithQuestionsSchema = Body(...)
 
 
 @quiz_router.post("/{quiz_id}", response_model=ResponseModel)
-async def quiz_submit(quiz_id: int, score: int, authorization: str = Header(...)):
+async def quiz_submit(
+    data: QuizSubmitRequest = Body(...), authorization: str = Header(...)
+):
     token = authorization.removeprefix("Bearer ")
     token_data = await token_services.get_data_from_token(token)
     current_user = await user_services.get_user_by_email(
         token_data["http://localhost:8000/email"]
     )
-    await quiz_services.quiz_submit(quiz_id, current_user.id, score)
+    await quiz_services.quiz_submit(current_user.id, data)
+
+
+@quiz_router.delete("/{quiz_id}", response_model=ResponseModel)
+async def delete_quiz(quiz_id: int):
+    await quiz_services.delete_quiz(quiz_id)
+    return ResponseModel(status_code=200, message="Deleted quiz")

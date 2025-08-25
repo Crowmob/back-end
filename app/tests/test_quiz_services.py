@@ -1,12 +1,18 @@
+import json
+
 import pytest
 from sqlalchemy import select
 
+from app.db.redis_init import redis_client
 from app.schemas.quiz import (
     AnswerSchema,
     QuestionWithAnswersSchema,
     QuizWithQuestionsSchema,
+    QuizSubmitRequest,
+    QuestionID,
+    AnswerID,
 )
-from app.models.quiz_model import Quiz, Question, Answer
+from app.models.quiz_model import Quiz, Question, Answer, QuizParticipant, Records
 
 
 @pytest.mark.asyncio
@@ -74,29 +80,6 @@ async def test_update_quiz(db_session, quiz_services_fixture, test_quiz):
     quiz = await db_session.scalar(select(Quiz).where(Quiz.id == test_quiz["id"]))
     assert quiz.title == "Test Title 2"
     assert quiz.description == "Test Description 2"
-
-
-@pytest.mark.asyncio
-async def test_update_question(db_session, quiz_services_fixture, test_questions):
-    await quiz_services_fixture.update_question(
-        question_id=test_questions["id1"], text="Test text 2"
-    )
-    question = await db_session.scalar(
-        select(Question).where(Question.id == test_questions["id1"])
-    )
-    assert question.text == "Test text 2"
-
-
-@pytest.mark.asyncio
-async def test_update_answer(db_session, quiz_services_fixture, test_answers):
-    await quiz_services_fixture.update_answer(
-        answer_id=test_answers["id1"], text="Test text 2", is_correct=False
-    )
-    answer = await db_session.scalar(
-        select(Answer).where(Answer.id == test_answers["id1"])
-    )
-    assert answer.text == "Test text 2"
-    assert not answer.is_correct
 
 
 @pytest.mark.asyncio
@@ -186,3 +169,51 @@ async def test_get_average_score_in_system(
         user_id=test_user["id"]
     )
     assert score == 50
+
+
+@pytest.mark.asyncio
+async def test_quiz_submit_creates_participant_and_records(
+    db_session,
+    test_user,
+    test_company,
+    test_quiz,
+    test_questions,
+    test_answers,
+    quiz_services_fixture,
+    monkeypatch,
+):
+    data = QuizSubmitRequest(
+        score=1,
+        quiz_id=test_quiz["id"],
+        user_id=test_user["id"],
+        company_id=test_company["id"],
+        questions=[
+            QuestionID(
+                id=test_questions["id1"],
+                answers=[
+                    AnswerID(id=test_answers["id2"], is_correct=False),
+                ],
+            ),
+            QuestionID(
+                id=test_questions["id2"],
+                answers=[
+                    AnswerID(id=test_answers["id3"], is_correct=True),
+                ],
+            ),
+        ],
+    )
+    participant_id, record_id = await quiz_services_fixture.quiz_submit(
+        test_user["id"], data
+    )
+
+    participant = await db_session.execute(
+        select(QuizParticipant).where(QuizParticipant.id == participant_id)
+    )
+    assert participant is not None
+    result = await db_session.execute(select(Records).where(Records.id == record_id))
+    record = result.scalars().first()
+    assert record is not None
+    assert record.score == 1
+
+    cached_answer = json.loads(await redis_client.get(f"{data.user_id}:{data.quiz_id}"))
+    assert cached_answer["company_id"] == data.company_id

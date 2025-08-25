@@ -1,8 +1,8 @@
 """added records
 
-Revision ID: c2894dab5c67
+Revision ID: 2d9be12f8b23
 Revises: 591c648ab3c1
-Create Date: 2025-08-20 16:17:54.387938
+Create Date: 2025-08-22 14:23:31.923069
 
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "c2894dab5c67"
+revision: str = "2d9be12f8b23"
 down_revision: Union[str, Sequence[str], None] = "591c648ab3c1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
