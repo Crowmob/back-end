@@ -9,18 +9,18 @@ async def test_send_membership_request(
     db_session, membership_services_fixture, test_company, test_user
 ):
     membership_id = await membership_services_fixture.send_membership_request(
-        "invite", test_company, test_user["id"]
+        "invite", test_company["id"], test_user["id"]
     )
     result = await db_session.execute(
         select(MembershipRequests).where(MembershipRequests.id == membership_id)
     )
     membership_request = result.scalar_one()
     assert membership_request.type == "invite"
-    assert membership_request.company_id == test_company
+    assert membership_request.company_id == test_company["id"]
     assert membership_request.user_id == test_user["id"]
 
     membership_id = await membership_services_fixture.send_membership_request(
-        "request", test_company, test_user["id"]
+        "request", test_company["id"], test_user["id"]
     )
     result = await db_session.execute(
         select(MembershipRequests).where(MembershipRequests.id == membership_id)
@@ -28,7 +28,7 @@ async def test_send_membership_request(
     membership_request = result.scalar_one()
     assert membership_request.type == "request"
     assert membership_request.user_id == test_user["id"]
-    assert membership_request.company_id == test_company
+    assert membership_request.company_id == test_company["id"]
 
 
 @pytest.mark.asyncio

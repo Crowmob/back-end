@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy import insert
 
 from app.models.company_model import Company
-from app.models.quiz_model import Answer, Question, Quiz
+from app.models.quiz_model import Answer, Question, Quiz, QuizParticipant, Records
 from app.services.quiz import quiz_services
 from app.services.user import user_services
 from app.services.company import company_services
@@ -91,19 +91,19 @@ async def test_user(db_session):
 async def test_company(db_session, test_user):
     result = await db_session.execute(
         insert(Company)
-        .values(owner=test_user["id"], name="test", description="test", private=True)
+        .values(owner=test_user["id"], name="test", description="test", private=False)
         .returning(Company.id)
     )
     company_id = result.one()[0]
     await db_session.commit()
-    return company_id
+    return {"id": company_id, "owner": test_user["id"]}
 
 
 @pytest_asyncio.fixture
 async def test_membership_request(db_session, test_user, test_company):
     result = await db_session.execute(
         insert(MembershipRequests)
-        .values(type="request", user_id=test_user["id"], company_id=test_company)
+        .values(type="request", user_id=test_user["id"], company_id=test_company["id"])
         .returning(MembershipRequests.id)
     )
     membership_request_id = result.one()[0]
@@ -111,7 +111,7 @@ async def test_membership_request(db_session, test_user, test_company):
     return {
         "id": membership_request_id,
         "user_id": test_user["id"],
-        "company_id": test_company,
+        "company_id": test_company["id"],
     }
 
 
@@ -119,26 +119,37 @@ async def test_membership_request(db_session, test_user, test_company):
 async def test_membership(db_session, test_user, test_company):
     result = await db_session.execute(
         insert(Memberships)
-        .values(user_id=test_user["id"], company_id=test_company)
+        .values(user_id=test_user["id"], company_id=test_company["id"])
         .returning(Memberships.id)
     )
     membership_id = result.one()[0]
     await db_session.commit()
-    return {"id": membership_id, "user_id": test_user["id"], "company_id": test_company}
+    return {
+        "id": membership_id,
+        "user_id": test_user["id"],
+        "company_id": test_company["id"],
+        "owner": test_company["owner"],
+    }
 
 
 @pytest_asyncio.fixture
-async def test_admin(db_session, test_user, test_company):
+async def test_admin(db_session, test_company):
     result = await db_session.execute(
         insert(Memberships)
         .values(
-            role=RoleEnum.ADMIN.value, user_id=test_user["id"], company_id=test_company
+            role=RoleEnum.ADMIN.value,
+            user_id=test_company["owner"],
+            company_id=test_company["id"],
         )
         .returning(Memberships.id)
     )
     membership_id = result.one()[0]
     await db_session.commit()
-    return {"id": membership_id, "user_id": test_user["id"], "company_id": test_company}
+    return {
+        "id": membership_id,
+        "user_id": test_company["owner"],
+        "company_id": test_company["id"],
+    }
 
 
 @pytest_asyncio.fixture
@@ -176,19 +187,13 @@ async def test_answers(db_session, test_questions):
 async def test_questions(db_session, test_quiz):
     result = await db_session.execute(
         insert(Question)
-        .values(
-            text="Test question",
-            quiz_id=test_quiz["id"],
-        )
+        .values(text="Test question", quiz_id=test_quiz["id"])
         .returning(Question.id)
     )
     question_id1 = result.one()[0]
     result = await db_session.execute(
         insert(Question)
-        .values(
-            text="Test question",
-            quiz_id=test_quiz["id"],
-        )
+        .values(text="Test question", quiz_id=test_quiz["id"])
         .returning(Question.id)
     )
     question_id2 = result.one()[0]
@@ -202,9 +207,34 @@ async def test_quiz(db_session, test_company):
         .values(
             title="Test quiz",
             description="Test quiz",
-            company_id=test_company,
+            company_id=test_company["id"],
         )
         .returning(Quiz.id)
     )
     quiz_id = result.one()[0]
-    return {"id": quiz_id, "company_id": test_company}
+    return {"id": quiz_id, "company_id": test_company["id"]}
+
+
+@pytest_asyncio.fixture
+async def test_participant(db_session, test_quiz, test_user):
+    result = await db_session.execute(
+        insert(QuizParticipant)
+        .values(
+            user_id=test_user["id"],
+            quiz_id=test_quiz["id"],
+        )
+        .returning(QuizParticipant.id)
+    )
+    participant_id = result.one()[0]
+    return {"id": participant_id, "quiz_id": test_quiz["id"]}
+
+
+@pytest_asyncio.fixture
+async def test_record(db_session, test_participant):
+    result = await db_session.execute(
+        insert(Records)
+        .values(participant_id=test_participant["id"], score=1)
+        .returning(Records.id)
+    )
+    record_id = result.one()[0]
+    return {"id": record_id, "participant_id": test_participant["id"]}

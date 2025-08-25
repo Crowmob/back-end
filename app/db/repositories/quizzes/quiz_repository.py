@@ -2,7 +2,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.base_repository import BaseRepository
-from app.models.quiz_model import QuizParticipant, Quiz
+from app.models.quiz_model import QuizParticipant, Quiz, Records
 from app.schemas.quiz import QuizSchema, QuizDetailResponse
 from app.schemas.response_models import ListResponse
 
@@ -12,8 +12,12 @@ class QuizRepository(BaseRepository[Quiz]):
         super().__init__(session, Quiz)
 
     async def create_quiz_participant(self, quiz_id: int, user_id: int, score: int):
-        quiz_participant = QuizParticipant(quiz_id, user_id, score)
+        quiz_participant = QuizParticipant(quiz_id, user_id)
         self.session.add(quiz_participant)
+        await self.session.flush()
+        await self.session.refresh(quiz_participant)
+        record = Records(participant_id=quiz_participant.id, score=score)
+        self.session.add(record)
 
     async def get_all_quizzes(
         self, company_id: int, limit: int | None = None, offset: int | None = None

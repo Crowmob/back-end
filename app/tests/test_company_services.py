@@ -52,29 +52,39 @@ async def test_get_all_companies(db_session, company_services_fixture, test_user
 
 
 @pytest.mark.asyncio
-async def test_get_company_by_id(company_services_fixture, test_company):
-    company = await company_services_fixture.get_company_by_id(test_company)
+async def test_get_company_by_id(company_services_fixture, test_membership):
+    company = await company_services_fixture.get_company_by_id(
+        test_membership["company_id"], test_membership["owner"]
+    )
 
     assert company.name == "test"
     assert company.description == "test"
 
 
 @pytest.mark.asyncio
-async def test_update_company(db_session, company_services_fixture, test_company):
+async def test_update_company(db_session, company_services_fixture, test_membership):
     data = CompanyUpdateRequestModel(name="updated")
     await company_services_fixture.update_company(
-        test_company, data.name, data.description, data.private
+        test_membership["company_id"],
+        data.name,
+        data.description,
+        data.private,
+        test_membership["owner"],
     )
 
     updated_company = await db_session.scalar(
-        select(Company).where(Company.id == test_company)
+        select(Company).where(Company.id == test_membership["company_id"])
     )
     assert updated_company.name == "updated"
 
 
 @pytest.mark.asyncio
-async def test_delete_company(db_session, company_services_fixture, test_company):
-    await company_services_fixture.delete_company(test_company)
+async def test_delete_company(db_session, company_services_fixture, test_membership):
+    await company_services_fixture.delete_company(
+        test_membership["company_id"], test_membership["owner"]
+    )
 
-    user = await db_session.scalar(select(Company).where(Company.id == test_company))
+    user = await db_session.scalar(
+        select(Company).where(Company.id == test_membership["company_id"])
+    )
     assert user is None

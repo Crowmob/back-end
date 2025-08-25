@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,6 +13,9 @@ from app.schemas.quiz import (
     QuizUpdateSchema,
     QuestionUpdateSchema,
     AnswerUpdateSchema,
+    QuizParticipantCreateSchema,
+    RecordCreateSchema,
+    QuizParticipantUpdateSchema,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,7 +36,8 @@ class QuizServices:
 
                 questions_data = [
                     QuestionCreateSchema(
-                        text=question.text, quiz_id=quiz_id
+                        text=question.text,
+                        quiz_id=quiz_id,
                     ).model_dump()
                     for question in quiz.questions
                 ]
@@ -169,6 +174,54 @@ class QuizServices:
             try:
                 await uow.answers.delete(answer_id)
                 logger.info(f"Deleted answer id: {answer_id}")
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise
+
+    @staticmethod
+    async def quiz_submit(quiz_id: int, user_id: int, score: int):
+        async with UnitOfWork() as uow:
+            try:
+                participant = await uow.participants.get_quiz_participant(
+                    quiz_id, user_id
+                )
+                if not participant:
+                    participant_id = await uow.participants.create(
+                        QuizParticipantCreateSchema(quiz_id=quiz_id, user_id=user_id)
+                    )
+                    logger.info(f"Created quiz participant")
+                else:
+                    participant_id = participant.id
+                    await uow.participants.update(
+                        QuizParticipantUpdateSchema(
+                            completed_at=datetime.datetime.now()
+                        )
+                    )
+                await uow.records.create(
+                    RecordCreateSchema(participant_id=participant_id, score=score)
+                )
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise
+
+    @staticmethod
+    async def get_average_score_in_company(user_id: int, company_id: int):
+        async with UnitOfWork() as uow:
+            try:
+                score = await uow.records.get_average_score_in_company(
+                    user_id, company_id
+                )
+                return score
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise
+
+    @staticmethod
+    async def get_average_score_in_system(user_id: int):
+        async with UnitOfWork() as uow:
+            try:
+                score = await uow.records.get_average_score_in_system(user_id)
+                return score
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise

@@ -28,15 +28,16 @@ async def get_all_companies(
     return await company_services.get_all_companies(data.limit, data.offset, user_id)
 
 
-@company_router.get("/{company_id}", response_model=CompanyDetailResponse)
+@company_router.get("/{company_id}", response_model=CompanyDetailResponse | None)
 async def get_company_by_id(company_id: int, authorization: str = Header(...)):
     token = authorization.removeprefix("Bearer ")
     token_data = await token_services.get_data_from_token(token)
     current_user = await user_services.get_user_by_email(token_data["email"])
     company = await company_services.get_company_by_id(company_id, current_user.id)
-    owner = await user_services.get_user_by_id(company.owner)
-    if current_user.email == owner.email:
-        company.is_owner = True
+    if company:
+        owner = await user_services.get_user_by_id(company.owner)
+        if current_user.email == owner.email:
+            company.is_owner = True
     return company
 
 

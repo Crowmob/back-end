@@ -5,6 +5,7 @@ import aiofiles
 
 from fastapi import UploadFile
 
+from app.core.exceptions.user_exceptions import UserWithEmailNotFoundException
 from app.services.user import user_services
 from app.utils.settings_model import settings
 from app.utils.token import token_services
@@ -53,9 +54,12 @@ class Auth0UserServices:
         return response.json()
 
     async def register_user(self, username: str, email: str, password: str):
-        user = await user_services.get_user_by_email(email)
-        if user:
-            return {"message": "invalid_signup"}
+        try:
+            user = await user_services.get_user_by_email(email)
+            if user:
+                return {"message": "invalid_signup"}
+        except UserWithEmailNotFoundException:
+            pass
         url = f"https://{settings.auth.AUTH0_DOMAIN}/dbconnections/signup"
         payload = {
             "client_id": settings.auth.CLIENT_ID,
