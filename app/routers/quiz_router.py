@@ -24,9 +24,13 @@ async def get_quiz_by_id(quiz_id: int, company_id: int):
     return await quiz_services.get_quiz_by_id(quiz_id, company_id)
 
 
-@quiz_router.post("/{company_id}", response_model=ResponseModel)
-async def create_quiz(company_id: int, data: QuizWithQuestionsSchema = Body(...)):
-    await quiz_services.create_quiz(company_id, data)
+@quiz_router.post("/{company_id}/{quiz_id}", response_model=ResponseModel)
+async def create_quiz(
+    company_id: int, quiz_id: int | str, data: QuizWithQuestionsSchema = Body(...)
+):
+    await quiz_services.create_quiz(
+        company_id, None if quiz_id == "null" else int(quiz_id), data
+    )
     return ResponseModel(status_code=200, message="Created quiz")
 
 

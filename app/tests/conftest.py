@@ -1,9 +1,11 @@
+import fakeredis
 import pytest
 import pytest_asyncio
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import insert
 
+from app.db.redis_init import get_redis_client
 from app.models.company_model import Company
 from app.models.quiz_model import Answer, Question, Quiz, QuizParticipant, Records
 from app.services.quiz import quiz_services
@@ -30,46 +32,53 @@ async def db_session():
         await session.rollback()
 
 
+@pytest_asyncio.fixture
+async def redis_client():
+    client = await fakeredis.aioredis.FakeRedis()
+    yield client
+    await client.close()
+
+
 @pytest.fixture
-def user_services_fixture(db_session, monkeypatch):
+def user_services_fixture(db_session, monkeypatch, redis_client):
     def unit_of_work_with_session():
-        return UnitOfWork(session=db_session)
+        return UnitOfWork(session=db_session, redis_client=redis_client)
 
     monkeypatch.setattr("app.services.user.UnitOfWork", unit_of_work_with_session)
     return user_services
 
 
 @pytest.fixture
-def company_services_fixture(db_session, monkeypatch):
+def company_services_fixture(db_session, monkeypatch, redis_client):
     def unit_of_work_with_session():
-        return UnitOfWork(session=db_session)
+        return UnitOfWork(session=db_session, redis_client=redis_client)
 
     monkeypatch.setattr("app.services.company.UnitOfWork", unit_of_work_with_session)
     return company_services
 
 
 @pytest.fixture
-def membership_services_fixture(db_session, monkeypatch):
+def membership_services_fixture(db_session, monkeypatch, redis_client):
     def unit_of_work_with_session():
-        return UnitOfWork(session=db_session)
+        return UnitOfWork(session=db_session, redis_client=redis_client)
 
     monkeypatch.setattr("app.services.membership.UnitOfWork", unit_of_work_with_session)
     return membership_services
 
 
 @pytest.fixture
-def admin_services_fixture(db_session, monkeypatch):
+def admin_services_fixture(db_session, monkeypatch, redis_client):
     def unit_of_work_with_session():
-        return UnitOfWork(session=db_session)
+        return UnitOfWork(session=db_session, redis_client=redis_client)
 
     monkeypatch.setattr("app.services.admin.UnitOfWork", unit_of_work_with_session)
     return admin_services
 
 
 @pytest.fixture
-def quiz_services_fixture(db_session, monkeypatch):
+def quiz_services_fixture(db_session, monkeypatch, redis_client):
     def unit_of_work_with_session():
-        return UnitOfWork(session=db_session)
+        return UnitOfWork(session=db_session, redis_client=redis_client)
 
     monkeypatch.setattr("app.services.quiz.UnitOfWork", unit_of_work_with_session)
     return quiz_services

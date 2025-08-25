@@ -19,16 +19,19 @@ from app.schemas.quiz import (
     QuizParticipantUpdateSchema,
     QuizSubmitRequest,
 )
-from app.db.redis_init import redis_client
 
 logger = logging.getLogger(__name__)
 
 
 class QuizServices:
     @staticmethod
-    async def create_quiz(company_id: int, quiz: QuizWithQuestionsSchema):
+    async def create_quiz(
+        company_id: int, quiz_id: int | None, quiz: QuizWithQuestionsSchema
+    ):
         async with UnitOfWork() as uow:
             try:
+                if quiz_id is not None:
+                    await uow.quizzes.delete(quiz_id)
                 quiz_id = await uow.quizzes.create(
                     QuizCreateSchema(
                         title=quiz.title,
@@ -184,15 +187,16 @@ class QuizServices:
                 for question in data.questions:
                     for answer in question.answers:
                         answer_data = {
+                            "quiz_id": data.quiz_id,
                             "company_id": data.company_id,
                             "question_id": question.id,
                             "answer_id": answer.id,
                             "is_correct": answer.is_correct,
                         }
-                        await redis_client.set(
-                            f"{data.user_id}:{data.quiz_id}",
-                            json.dumps(answer_data),
-                            ex=172800,
+                        await uow.redis_base.set(
+                            f"{participant_id}:{record_id}:{answer.id}",
+                            answer_data,
+                            172800,
                         )
                 return participant_id, record_id
             except SQLAlchemyError as e:

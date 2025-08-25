@@ -3,7 +3,6 @@ import json
 import pytest
 from sqlalchemy import select
 
-from app.db.redis_init import redis_client
 from app.schemas.quiz import (
     AnswerSchema,
     QuestionWithAnswersSchema,
@@ -38,7 +37,7 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
         ],
     )
     quiz_id = await quiz_services_fixture.create_quiz(
-        company_id=test_company["id"], quiz=quiz1
+        company_id=test_company["id"], quiz_id=None, quiz=quiz1
     )
     assert isinstance(quiz_id, int)
 
@@ -172,8 +171,9 @@ async def test_get_average_score_in_system(
 
 
 @pytest.mark.asyncio
-async def test_quiz_submit_creates_participant_and_records(
+async def test_quiz_submit(
     db_session,
+    redis_client,
     test_user,
     test_company,
     test_quiz,
@@ -215,5 +215,8 @@ async def test_quiz_submit_creates_participant_and_records(
     assert record is not None
     assert record.score == 1
 
-    cached_answer = json.loads(await redis_client.get(f"{data.user_id}:{data.quiz_id}"))
+    cached_raw = await redis_client.get(
+        f"{participant_id}:{record_id}:{data.questions[0].answers[0].id}"
+    )
+    cached_answer = json.loads(cached_raw.decode("utf-8"))
     assert cached_answer["company_id"] == data.company_id
