@@ -1,10 +1,10 @@
-import json
+from redis.asyncio import Redis
 
 from app.db.repositories.redis.base_redis_repository import BaseRedisRepository
 
 
 class QuizRedisRepository(BaseRedisRepository):
-    def __init__(self, redis):
+    def __init__(self, redis: Redis):
         super().__init__(redis)
 
     async def save_answers(
