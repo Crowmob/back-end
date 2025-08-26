@@ -9,6 +9,7 @@ from app.schemas.quiz import (
     QuizWithQuestionsSchema,
     QuestionWithAnswersSchema,
     AnswerSchema,
+    AnswerDetailResponse,
 )
 from app.schemas.response_models import ListResponse
 
@@ -18,7 +19,7 @@ class QuizRepository(BaseRepository[Quiz]):
         super().__init__(session, Quiz)
 
     async def create_quiz_participant(self, quiz_id: int, user_id: int, score: int):
-        quiz_participant = QuizParticipant(quiz_id, user_id)
+        quiz_participant = QuizParticipant(quiz_id=quiz_id, user_id=user_id)
         self.session.add(quiz_participant)
         await self.session.flush()
         await self.session.refresh(quiz_participant)
@@ -35,13 +36,17 @@ class QuizRepository(BaseRepository[Quiz]):
         quiz = result.scalar_one_or_none()
 
         return QuizWithQuestionsSchema(
+            id=quiz.id,
             title=quiz.title,
             description=quiz.description or "",
             questions=[
                 QuestionWithAnswersSchema(
+                    id=q.id,
                     text=q.text,
                     answers=[
-                        AnswerSchema(text=a.text, is_correct=a.is_correct)
+                        AnswerDetailResponse(
+                            id=a.id, text=a.text, is_correct=a.is_correct
+                        )
                         for a in q.answers
                     ],
                 )

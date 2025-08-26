@@ -10,6 +10,7 @@ from app.schemas.quiz import (
     QuizSubmitRequest,
     QuestionID,
     AnswerID,
+    AnswerDetailResponse,
 )
 from app.models.quiz_model import Quiz, Question, Answer, QuizParticipant, Records
 
@@ -17,21 +18,24 @@ from app.models.quiz_model import Quiz, Question, Answer, QuizParticipant, Recor
 @pytest.mark.asyncio
 async def test_create_quiz(db_session, quiz_services_fixture, test_company):
     quiz1 = QuizWithQuestionsSchema(
+        id=1,
         title="Test Quiz",
         description="Test description",
         questions=[
             QuestionWithAnswersSchema(
+                id=1,
                 text="Test text",
                 answers=[
-                    AnswerSchema(text="Test answer", is_correct=True),
-                    AnswerSchema(text="Test answer2", is_correct=False),
+                    AnswerDetailResponse(id=1, text="Test answer", is_correct=True),
+                    AnswerDetailResponse(id=2, text="Test answer2", is_correct=False),
                 ],
             ),
             QuestionWithAnswersSchema(
+                id=2,
                 text="Test text",
                 answers=[
-                    AnswerSchema(text="Test answer", is_correct=True),
-                    AnswerSchema(text="Test answer2", is_correct=False),
+                    AnswerDetailResponse(id=3, text="Test answer", is_correct=True),
+                    AnswerDetailResponse(id=4, text="Test answer2", is_correct=False),
                 ],
             ),
         ],
@@ -191,13 +195,13 @@ async def test_quiz_submit(
             QuestionID(
                 id=test_questions["id1"],
                 answers=[
-                    AnswerID(id=test_answers["id2"], is_correct=False),
+                    AnswerID(id=test_answers["id2"]),
                 ],
             ),
             QuestionID(
                 id=test_questions["id2"],
                 answers=[
-                    AnswerID(id=test_answers["id3"], is_correct=True),
+                    AnswerID(id=test_answers["id3"]),
                 ],
             ),
         ],

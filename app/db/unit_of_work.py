@@ -9,16 +9,14 @@ from app.db.repositories.quizzes.participant_repository import QuizParticipantRe
 from app.db.repositories.quizzes.question_repository import QuestionRepository
 from app.db.repositories.quizzes.quiz_repository import QuizRepository
 from app.db.repositories.quizzes.record_repository import RecordsRepository
-from app.db.repositories.redis.base_redis_repository import BaseRedisRepository
 from app.db.repositories.user_repository import UserRepository
 from app.db.repositories.company_repository import CompanyRepository
 from app.db.repositories.membership_repository import MembershipRepository
 
 
 class UnitOfWork:
-    def __init__(self, session: AsyncSession | None = None, redis_client=None):
+    def __init__(self, session: AsyncSession | None = None):
         self._external_session = session
-        self.redis_client = redis_client
         self.session = None
         self.users = None
         self.companies = None
@@ -29,7 +27,6 @@ class UnitOfWork:
         self.answers = None
         self.participants = None
         self.records = None
-        self.redis_base = None
 
     async def __aenter__(self):
         if self._external_session:
@@ -47,7 +44,6 @@ class UnitOfWork:
         self.answers = AnswerRepository(self.session)
         self.participants = QuizParticipantRepository(self.session)
         self.records = RecordsRepository(self.session)
-        self.redis_base = BaseRedisRepository(self.redis_client)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

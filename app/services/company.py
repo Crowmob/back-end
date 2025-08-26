@@ -61,7 +61,7 @@ class CompanyServices:
             company = await uow.companies.get_company_by_id(company_id, current_user)
             if not company:
                 logger.warning(f"No company found with id={company_id}")
-                return None
+                raise CompanyWithIdNotFoundException(company_id)
             logger.info(f"Fetched company with id={company_id}")
             return company
 

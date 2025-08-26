@@ -26,8 +26,12 @@ class QuizParticipantSchema(BaseModel):
     completed_at: datetime
 
 
-class QuestionWithAnswersSchema(QuestionSchema, BaseModel):
-    answers: list[AnswerSchema]
+class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class QuestionWithAnswersSchema(IDMixin, QuestionSchema, BaseModel):
+    answers: list[AnswerDetailResponse]
 
     @model_validator(mode="after")
     def validate_answers(self) -> "QuestionWithAnswersSchema":
@@ -38,7 +42,7 @@ class QuestionWithAnswersSchema(QuestionSchema, BaseModel):
         return self
 
 
-class QuizWithQuestionsSchema(QuizSchema, BaseModel):
+class QuizWithQuestionsSchema(IDMixin, QuizSchema, BaseModel):
     questions: list[QuestionWithAnswersSchema]
 
     @model_validator(mode="after")
@@ -46,10 +50,6 @@ class QuizWithQuestionsSchema(QuizSchema, BaseModel):
         if len(self.questions) < 2:
             raise QuizException(detail="Quiz should have at least 2 questions")
         return self
-
-
-class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
-    model_config = ConfigDict(from_attributes=True)
 
 
 class QuestionDetailResponse(IDMixin, QuestionSchema, BaseModel):
@@ -115,7 +115,7 @@ class AllQuizzesResponse(BaseModel):
 
 
 class AnswerID(IDMixin, BaseModel):
-    is_correct: bool
+    pass
 
 
 class QuestionID(IDMixin, BaseModel):

@@ -5,6 +5,8 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.exceptions.quiz_exceptions import QuizException, NotFoundByIdException
+from app.db.redis_init import get_redis_client
+from app.db.repositories.redis.quiz_redis_repository import QuizRedisRepository
 from app.db.unit_of_work import UnitOfWork
 from app.schemas.quiz import (
     QuizWithQuestionsSchema,
@@ -184,20 +186,21 @@ class QuizServices:
                         participant_id=participant_id, score=data.score
                     ).model_dump()
                 )
-                for question in data.questions:
-                    for answer in question.answers:
-                        answer_data = {
-                            "quiz_id": data.quiz_id,
-                            "company_id": data.company_id,
-                            "question_id": question.id,
-                            "answer_id": answer.id,
-                            "is_correct": answer.is_correct,
-                        }
-                        await uow.redis_base.set(
-                            f"{participant_id}:{record_id}:{answer.id}",
-                            answer_data,
-                            172800,
-                        )
+
+                quiz_repo = QuizRedisRepository(get_redis_client())
+                answers_data = [
+                    {
+                        "quiz_id": data.quiz_id,
+                        "company_id": data.company_id,
+                        "question_id": question.id,
+                        "answer_id": answer.id,
+                    }
+                    for question in data.questions
+                    for answer in question.answers
+                ]
+
+                await quiz_repo.save_answers(participant_id, record_id, answers_data)
+
                 return participant_id, record_id
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
