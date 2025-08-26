@@ -35,15 +35,9 @@ async def create_quiz(
 
 
 @quiz_router.post("/{quiz_id}", response_model=ResponseModel)
-async def quiz_submit(
-    data: QuizSubmitRequest = Body(...), authorization: str = Header(...)
-):
-    token = authorization.removeprefix("Bearer ")
-    token_data = await token_services.get_data_from_token(token)
-    current_user = await user_services.get_user_by_email(
-        token_data["http://localhost:8000/email"]
-    )
-    await quiz_services.quiz_submit(current_user.id, data)
+async def quiz_submit(data: QuizSubmitRequest = Body(...)):
+    await quiz_services.quiz_submit(data)
+    return ResponseModel(status_code=200, message="Submitted quiz")
 
 
 @quiz_router.delete("/{quiz_id}", response_model=ResponseModel)

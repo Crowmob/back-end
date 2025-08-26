@@ -206,9 +206,7 @@ async def test_quiz_submit(
             ),
         ],
     )
-    participant_id, record_id = await quiz_services_fixture.quiz_submit(
-        test_user["id"], data
-    )
+    participant_id, record_id = await quiz_services_fixture.quiz_submit(data)
 
     participant = await db_session.execute(
         select(QuizParticipant).where(QuizParticipant.id == participant_id)

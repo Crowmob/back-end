@@ -161,16 +161,16 @@ class QuizServices:
                 raise
 
     @staticmethod
-    async def quiz_submit(user_id: int, data: QuizSubmitRequest):
+    async def quiz_submit(data: QuizSubmitRequest):
         async with UnitOfWork() as uow:
             try:
                 participant = await uow.participants.get_quiz_participant(
-                    data.quiz_id, user_id
+                    data.quiz_id, data.user_id
                 )
                 if not participant:
                     participant_id = await uow.participants.create(
                         QuizParticipantCreateSchema(
-                            quiz_id=data.quiz_id, user_id=user_id
+                            quiz_id=data.quiz_id, user_id=data.user_id
                         ).model_dump()
                     )
                     logger.info(f"Created quiz participant")
@@ -194,12 +194,14 @@ class QuizServices:
                         "company_id": data.company_id,
                         "question_id": question.id,
                         "answer_id": answer.id,
+                        "participant_id": participant_id,
+                        "record_id": record_id,
                     }
                     for question in data.questions
                     for answer in question.answers
                 ]
 
-                await quiz_repo.save_answers(participant_id, record_id, answers_data)
+                await quiz_repo.save_answers(answers_data)
 
                 return participant_id, record_id
             except SQLAlchemyError as e:

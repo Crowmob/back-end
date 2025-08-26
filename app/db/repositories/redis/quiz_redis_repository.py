@@ -1,16 +1,12 @@
-from redis.asyncio import Redis
-
 from app.db.repositories.redis.base_redis_repository import BaseRedisRepository
 
 
 class QuizRedisRepository(BaseRedisRepository):
-    def __init__(self, redis: Redis):
-        super().__init__(redis)
+    expire = 172800
 
-    async def save_answers(
-        self, participant_id: str, record_id: str, answers: list[dict]
-    ):
-        def get_key(answer):
-            return f"{participant_id}:{record_id}:{answer['answer_id']}"
+    @staticmethod
+    def get_key(item: dict):
+        return f"{item['participant_id']}:{item['record_id']}:{item['answer_id']}"
 
-        await super().set(data=answers, get_key=get_key, expire=172800)
+    async def save_answers(self, answers: list[dict]):
+        await super().set(data=answers, expire=self.expire)
