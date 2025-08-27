@@ -1,10 +1,10 @@
+import csv
 import datetime
-import json
 import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.exceptions.quiz_exceptions import QuizException, NotFoundByIdException
+from app.core.exceptions.quiz_exceptions import NotFoundByIdException
 from app.db.redis_init import get_redis_client
 from app.db.repositories.redis.quiz_redis_repository import QuizRedisRepository
 from app.db.unit_of_work import UnitOfWork
@@ -14,8 +14,6 @@ from app.schemas.quiz import (
     QuizCreateSchema,
     AnswerCreateSchema,
     QuizUpdateSchema,
-    QuestionUpdateSchema,
-    AnswerUpdateSchema,
     QuizParticipantCreateSchema,
     RecordCreateSchema,
     QuizParticipantUpdateSchema,
@@ -39,6 +37,7 @@ class QuizServices:
                         title=quiz.title,
                         description=quiz.description,
                         company_id=company_id,
+                        frequency=quiz.frequency,
                     ).model_dump()
                 )
 
@@ -81,31 +80,16 @@ class QuizServices:
 
     @staticmethod
     async def get_all_quizzes(
-        company_id: int, limit: int | None = None, offset: int | None = None
+        company_id: int,
+        user_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
-                return await uow.quizzes.get_all_quizzes(company_id, limit, offset)
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemyError: {e}")
-                raise
-
-    @staticmethod
-    async def get_all_questions(
-        quiz_id: int, limit: int | None = None, offset: int | None = None
-    ):
-        async with UnitOfWork() as uow:
-            try:
-                return await uow.questions.get_all_questions(quiz_id, limit, offset)
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemyError: {e}")
-                raise
-
-    @staticmethod
-    async def get_all_answers(question_id: int):
-        async with UnitOfWork() as uow:
-            try:
-                return await uow.answers.get_all_answers(question_id)
+                return await uow.quizzes.get_all_quizzes(
+                    company_id, user_id, limit, offset
+                )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise
@@ -141,26 +125,6 @@ class QuizServices:
                 raise
 
     @staticmethod
-    async def delete_question(question_id):
-        async with UnitOfWork() as uow:
-            try:
-                await uow.questions.delete(question_id)
-                logger.info(f"Deleted question id: {question_id}")
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemyError: {e}")
-                raise
-
-    @staticmethod
-    async def delete_answer(answer_id):
-        async with UnitOfWork() as uow:
-            try:
-                await uow.answers.delete(answer_id)
-                logger.info(f"Deleted answer id: {answer_id}")
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemyError: {e}")
-                raise
-
-    @staticmethod
     async def quiz_submit(data: QuizSubmitRequest):
         async with UnitOfWork() as uow:
             try:
@@ -177,33 +141,41 @@ class QuizServices:
                 else:
                     participant_id = participant.id
                     await uow.participants.update(
+                        participant_id,
                         QuizParticipantUpdateSchema(
                             completed_at=datetime.datetime.now()
-                        ).model_dump()
+                        ).model_dump(),
                     )
                 record_id = await uow.records.create(
                     RecordCreateSchema(
                         participant_id=participant_id, score=data.score
                     ).model_dump()
                 )
+                selected_answers = [
+                    answer.id
+                    for question in data.questions
+                    for answer in question.answers
+                ]
+                answer_ids = await uow.answers.create_selected_answers(
+                    record_id, selected_answers
+                )
 
-                quiz_repo = QuizRedisRepository(get_redis_client())
+                quiz_redis_repo = QuizRedisRepository(get_redis_client())
                 answers_data = [
                     {
                         "quiz_id": data.quiz_id,
                         "company_id": data.company_id,
-                        "question_id": question.id,
-                        "answer_id": answer.id,
+                        "answer_id": answer_id,
                         "participant_id": participant_id,
+                        "user_id": data.user_id,
                         "record_id": record_id,
                     }
-                    for question in data.questions
-                    for answer in question.answers
+                    for answer_id in answer_ids
                 ]
 
-                await quiz_repo.save_answers(answers_data)
+                await quiz_redis_repo.save_answers(answers_data)
 
-                return participant_id, record_id
+                return participant_id, record_id, answer_ids
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise
@@ -226,6 +198,41 @@ class QuizServices:
             try:
                 score = await uow.records.get_average_score_in_system(user_id)
                 return score
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise
+
+    @staticmethod
+    async def get_quiz_data_for_user(
+        user_id: int, quiz_id: int = None, company_id: int = None
+    ):
+        async with UnitOfWork() as uow:
+            try:
+                quiz_redis_repo = QuizRedisRepository(get_redis_client())
+                answers = await quiz_redis_repo.get_answers_for_user(
+                    user_id, quiz_id, company_id
+                )
+
+                answer_ids = [answer["answer_id"] for answer in answers]
+                answers = list(answers)
+
+                missing_answers = await uow.answers.get_missing_answers(
+                    answer_ids, user_id, quiz_id, company_id
+                )
+                answers.extend(
+                    [
+                        {
+                            "answer_id": answer.id,
+                        }
+                        for answer in missing_answers
+                    ]
+                )
+
+                quiz_data = await uow.quizzes.get_full_quiz_data_for_user(
+                    [answer["answer_id"] for answer in answers]
+                )
+                logger.info(quiz_data)
+                return quiz_data
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise

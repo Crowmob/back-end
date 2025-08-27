@@ -18,6 +18,9 @@ class Quiz(Base, IDMixin, TimestampMixin):
     questions: Mapped[list["Question"]] = relationship(
         back_populates="quiz", cascade="all, delete-orphan"
     )
+    frequency: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    participants = relationship("QuizParticipant", back_populates="quiz")
 
 
 class QuizParticipant(Base, IDMixin):
@@ -33,6 +36,8 @@ class QuizParticipant(Base, IDMixin):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    quiz = relationship("Quiz", back_populates="participants")
+
 
 class Records(Base, IDMixin):
     __tablename__ = "records"
@@ -40,6 +45,17 @@ class Records(Base, IDMixin):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     participant_id: Mapped[int] = mapped_column(
         ForeignKey("quiz_participants.id", ondelete="CASCADE"), nullable=False
+    )
+
+
+class SelectedAnswers(Base, IDMixin):
+    __tablename__ = "selected_answers"
+
+    record_id: Mapped[int] = mapped_column(
+        ForeignKey("records.id", ondelete="CASCADE"), nullable=False
+    )
+    answer_id: Mapped[int] = mapped_column(
+        ForeignKey("answers.id", ondelete="CASCADE"), nullable=False
     )
 
 

@@ -9,6 +9,7 @@ from app.schemas.base import TimestampMixin, IDMixin
 class QuizSchema(BaseModel):
     title: str
     description: str
+    frequency: int
 
 
 class QuestionSchema(BaseModel):
@@ -26,12 +27,8 @@ class QuizParticipantSchema(BaseModel):
     completed_at: datetime
 
 
-class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-
-class QuestionWithAnswersSchema(IDMixin, QuestionSchema, BaseModel):
-    answers: list[AnswerDetailResponse]
+class QuestionWithAnswersSchema(QuestionSchema, BaseModel):
+    answers: list[AnswerSchema]
 
     @model_validator(mode="after")
     def validate_answers(self) -> "QuestionWithAnswersSchema":
@@ -42,7 +39,7 @@ class QuestionWithAnswersSchema(IDMixin, QuestionSchema, BaseModel):
         return self
 
 
-class QuizWithQuestionsSchema(IDMixin, QuizSchema, BaseModel):
+class QuizWithQuestionsSchema(QuizSchema, BaseModel):
     questions: list[QuestionWithAnswersSchema]
 
     @model_validator(mode="after")
@@ -57,11 +54,23 @@ class QuestionDetailResponse(IDMixin, QuestionSchema, BaseModel):
 
 
 class QuizDetailResponse(IDMixin, QuizSchema, BaseModel):
-    pass
+    is_available: bool
+
+
+class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class QuestionWithAnswersDetailResponse(IDMixin, QuestionSchema, BaseModel):
+    answers: list[AnswerDetailResponse]
+
+
+class QuizWithQuestionsDetailResponse(IDMixin, QuizSchema, BaseModel):
+    questions: list[QuestionWithAnswersDetailResponse]
 
 
 class QuizParticipantDetailResponse(IDMixin, QuizParticipantSchema, BaseModel):
-    pass
+    model_config = {"from_attributes": True}
 
 
 class QuizCreateSchema(QuizSchema, BaseModel):

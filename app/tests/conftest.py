@@ -6,7 +6,14 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy import insert
 
 from app.models.company_model import Company
-from app.models.quiz_model import Answer, Question, Quiz, QuizParticipant, Records
+from app.models.quiz_model import (
+    Answer,
+    Question,
+    Quiz,
+    QuizParticipant,
+    Records,
+    SelectedAnswers,
+)
 from app.services.quiz import quiz_services
 from app.services.user import user_services
 from app.services.company import company_services
@@ -35,7 +42,7 @@ async def db_session():
 async def redis_client():
     client = await fakeredis.aioredis.FakeRedis()
     yield client
-    await client.close()
+    await client.aclose()
 
 
 @pytest.fixture
@@ -217,11 +224,16 @@ async def test_quiz(db_session, test_company):
             title="Test quiz",
             description="Test quiz",
             company_id=test_company["id"],
+            frequency=1,
         )
         .returning(Quiz.id)
     )
     quiz_id = result.one()[0]
-    return {"id": quiz_id, "company_id": test_company["id"]}
+    return {
+        "id": quiz_id,
+        "company_id": test_company["id"],
+        "user_id": test_company["owner"],
+    }
 
 
 @pytest_asyncio.fixture
@@ -247,3 +259,14 @@ async def test_record(db_session, test_participant):
     )
     record_id = result.one()[0]
     return {"id": record_id, "participant_id": test_participant["id"]}
+
+
+@pytest_asyncio.fixture
+async def test_selected_answer(db_session, test_answers, test_record):
+    result = await db_session.execute(
+        insert(SelectedAnswers)
+        .values(record_id=test_record["id"], answer_id=test_answers["id1"])
+        .returning(SelectedAnswers.id)
+    )
+    answer_id = result.one()[0]
+    return {"id": answer_id, "record_id": test_record["id"]}
