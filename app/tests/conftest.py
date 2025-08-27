@@ -1,3 +1,4 @@
+import fakeredis
 import pytest
 import pytest_asyncio
 
@@ -28,6 +29,13 @@ async def db_session():
         await clear_tables(session)
         yield session
         await session.rollback()
+
+
+@pytest_asyncio.fixture
+async def redis_client():
+    client = await fakeredis.aioredis.FakeRedis()
+    yield client
+    await client.close()
 
 
 @pytest.fixture
@@ -67,11 +75,12 @@ def admin_services_fixture(db_session, monkeypatch):
 
 
 @pytest.fixture
-def quiz_services_fixture(db_session, monkeypatch):
+def quiz_services_fixture(db_session, redis_client, monkeypatch):
     def unit_of_work_with_session():
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.quiz.UnitOfWork", unit_of_work_with_session)
+    monkeypatch.setattr("app.services.quiz.get_redis_client", lambda: redis_client)
     return quiz_services
 
 

@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from sqlalchemy import select
 
@@ -5,34 +7,41 @@ from app.schemas.quiz import (
     AnswerSchema,
     QuestionWithAnswersSchema,
     QuizWithQuestionsSchema,
+    QuizSubmitRequest,
+    QuestionID,
+    AnswerID,
+    AnswerDetailResponse,
 )
-from app.models.quiz_model import Quiz, Question, Answer
+from app.models.quiz_model import Quiz, Question, Answer, QuizParticipant, Records
 
 
 @pytest.mark.asyncio
 async def test_create_quiz(db_session, quiz_services_fixture, test_company):
     quiz1 = QuizWithQuestionsSchema(
+        id=1,
         title="Test Quiz",
         description="Test description",
         questions=[
             QuestionWithAnswersSchema(
+                id=1,
                 text="Test text",
                 answers=[
-                    AnswerSchema(text="Test answer", is_correct=True),
-                    AnswerSchema(text="Test answer2", is_correct=False),
+                    AnswerDetailResponse(id=1, text="Test answer", is_correct=True),
+                    AnswerDetailResponse(id=2, text="Test answer2", is_correct=False),
                 ],
             ),
             QuestionWithAnswersSchema(
+                id=2,
                 text="Test text",
                 answers=[
-                    AnswerSchema(text="Test answer", is_correct=True),
-                    AnswerSchema(text="Test answer2", is_correct=False),
+                    AnswerDetailResponse(id=3, text="Test answer", is_correct=True),
+                    AnswerDetailResponse(id=4, text="Test answer2", is_correct=False),
                 ],
             ),
         ],
     )
     quiz_id = await quiz_services_fixture.create_quiz(
-        company_id=test_company["id"], quiz=quiz1
+        company_id=test_company["id"], quiz_id=None, quiz=quiz1
     )
     assert isinstance(quiz_id, int)
 
@@ -74,29 +83,6 @@ async def test_update_quiz(db_session, quiz_services_fixture, test_quiz):
     quiz = await db_session.scalar(select(Quiz).where(Quiz.id == test_quiz["id"]))
     assert quiz.title == "Test Title 2"
     assert quiz.description == "Test Description 2"
-
-
-@pytest.mark.asyncio
-async def test_update_question(db_session, quiz_services_fixture, test_questions):
-    await quiz_services_fixture.update_question(
-        question_id=test_questions["id1"], text="Test text 2"
-    )
-    question = await db_session.scalar(
-        select(Question).where(Question.id == test_questions["id1"])
-    )
-    assert question.text == "Test text 2"
-
-
-@pytest.mark.asyncio
-async def test_update_answer(db_session, quiz_services_fixture, test_answers):
-    await quiz_services_fixture.update_answer(
-        answer_id=test_answers["id1"], text="Test text 2", is_correct=False
-    )
-    answer = await db_session.scalar(
-        select(Answer).where(Answer.id == test_answers["id1"])
-    )
-    assert answer.text == "Test text 2"
-    assert not answer.is_correct
 
 
 @pytest.mark.asyncio
@@ -186,3 +172,53 @@ async def test_get_average_score_in_system(
         user_id=test_user["id"]
     )
     assert score == 50
+
+
+@pytest.mark.asyncio
+async def test_quiz_submit(
+    db_session,
+    redis_client,
+    test_user,
+    test_company,
+    test_quiz,
+    test_questions,
+    test_answers,
+    quiz_services_fixture,
+    monkeypatch,
+):
+    data = QuizSubmitRequest(
+        score=1,
+        quiz_id=test_quiz["id"],
+        user_id=test_user["id"],
+        company_id=test_company["id"],
+        questions=[
+            QuestionID(
+                id=test_questions["id1"],
+                answers=[
+                    AnswerID(id=test_answers["id2"]),
+                ],
+            ),
+            QuestionID(
+                id=test_questions["id2"],
+                answers=[
+                    AnswerID(id=test_answers["id3"]),
+                ],
+            ),
+        ],
+    )
+    participant_id, record_id = await quiz_services_fixture.quiz_submit(data)
+
+    participant = await db_session.execute(
+        select(QuizParticipant).where(QuizParticipant.id == participant_id)
+    )
+    assert participant is not None
+    result = await db_session.execute(select(Records).where(Records.id == record_id))
+    record = result.scalars().first()
+    assert record is not None
+    assert record.score == 1
+
+    cached_raw = await redis_client.get(
+        f"{participant_id}:{record_id}:{data.questions[0].answers[0].id}"
+    )
+    cached_answer = json.loads(cached_raw.decode("utf-8"))
+    assert cached_answer["company_id"] == data.company_id

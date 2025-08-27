@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import ForeignKey, String, Integer, func, DateTime, Boolean
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, IDMixin, TimestampMixin
 
@@ -14,6 +14,10 @@ class Quiz(Base, IDMixin, TimestampMixin):
     )
     title: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    questions: Mapped[list["Question"]] = relationship(
+        back_populates="quiz", cascade="all, delete-orphan"
+    )
 
 
 class QuizParticipant(Base, IDMixin):
@@ -47,6 +51,11 @@ class Question(Base, IDMixin):
     )
     text: Mapped[str] = mapped_column(String(512), nullable=False)
 
+    quiz: Mapped["Quiz"] = relationship(back_populates="questions")
+    answers: Mapped[list["Answer"]] = relationship(
+        back_populates="question", cascade="all, delete-orphan"
+    )
+
 
 class Answer(Base, IDMixin):
     __tablename__ = "answers"
@@ -56,3 +65,5 @@ class Answer(Base, IDMixin):
         ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
     )
     is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+    question: Mapped["Question"] = relationship(back_populates="answers")
