@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from sqlalchemy import select, func, and_, Integer, cast, case, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, aliased
@@ -13,13 +11,6 @@ from app.models.quiz_model import (
     Answer,
     SelectedAnswers,
 )
-from app.schemas.quiz import (
-    QuizDetailResponse,
-    AnswerDetailResponse,
-    QuizWithQuestionsDetailResponse,
-    QuestionWithAnswersDetailResponse,
-)
-from app.schemas.response_models import ListResponse
 
 
 class QuizRepository(BaseRepository[Quiz]):
@@ -46,25 +37,7 @@ class QuizRepository(BaseRepository[Quiz]):
         if quiz is None:
             return None
 
-        return QuizWithQuestionsDetailResponse(
-            id=quiz.id,
-            title=quiz.title,
-            description=quiz.description or "",
-            frequency=quiz.frequency,
-            questions=[
-                QuestionWithAnswersDetailResponse(
-                    id=q.id,
-                    text=q.text,
-                    answers=[
-                        AnswerDetailResponse(
-                            id=a.id, text=a.text, is_correct=a.is_correct
-                        )
-                        for a in q.answers
-                    ],
-                )
-                for q in quiz.questions
-            ],
-        )
+        return quiz
 
     async def get_all_quizzes(
         self,
@@ -107,21 +80,9 @@ class QuizRepository(BaseRepository[Quiz]):
         rows = result.all()
 
         if not rows:
-            return ListResponse[QuizDetailResponse](items=[], count=0)
+            return None
 
-        total_count = rows[0][5]
-        items = [
-            QuizDetailResponse(
-                id=row.id,
-                title=row.title,
-                description=row.description,
-                frequency=row.frequency,
-                is_available=row.is_available,
-            )
-            for row in rows
-        ]
-
-        return ListResponse[QuizDetailResponse](items=items, count=total_count)
+        return rows
 
     async def get_full_quiz_data_for_user(self, selected_answer_ids: list[int]):
         query = (
@@ -142,13 +103,4 @@ class QuizRepository(BaseRepository[Quiz]):
         result = await self.session.execute(query)
         rows = result.fetchall()
 
-        return [
-            {
-                "quiz_title": r.quiz_title,
-                "quiz_description": r.quiz_description,
-                "question_text": r.question_text,
-                "answer_text": r.answer_text,
-                "is_correct": r.is_correct,
-            }
-            for r in rows
-        ]
+        return rows

@@ -1,13 +1,11 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete, func, and_, or_
+from sqlalchemy import func, and_, or_
 
 from app.models.company_model import Company
 from app.models.membership_model import Memberships
 from app.schemas.company import (
     CompanyDetailResponse,
-    CompanySchema,
-    CompanyUpdateRequestModel,
 )
 from app.schemas.response_models import ListResponse
 from app.db.repositories.base_repository import BaseRepository
@@ -55,19 +53,7 @@ class CompanyRepository(BaseRepository[Company]):
                 )
                 for company, _ in rows
             ]
-        return ListResponse[CompanyDetailResponse](
-            items=[
-                CompanyDetailResponse(
-                    id=company.id,
-                    owner=company.owner,
-                    name=company.name,
-                    description=company.description,
-                    private=company.private,
-                )
-                for company in items
-            ],
-            count=total_count,
-        )
+        return items, total_count
 
     async def get_companies_for_user(
         self, user_id: int, limit: int | None = None, offset: int | None = None
@@ -84,23 +70,9 @@ class CompanyRepository(BaseRepository[Company]):
         rows = result.all()
 
         if not rows:
-            return ListResponse[CompanyDetailResponse](items=[], count=0)
+            return None
 
-        total_count = rows[0][2]
-
-        items = [
-            CompanyDetailResponse(
-                id=company.id,
-                owner=company.owner,
-                name=company.name,
-                description=company.description,
-                private=company.private,
-                user_role=role,
-            )
-            for company, role, _ in rows
-        ]
-
-        return ListResponse[CompanyDetailResponse](items=items, count=total_count)
+        return rows
 
     async def get_companies_by_ids(self, ids: list[int]):
         if not ids:
@@ -110,19 +82,7 @@ class CompanyRepository(BaseRepository[Company]):
             limit=None,
             offset=None,
         )
-        return ListResponse[CompanyDetailResponse](
-            items=[
-                CompanyDetailResponse(
-                    id=company.id,
-                    owner=company.owner,
-                    name=company.name,
-                    description=company.description,
-                    private=company.private,
-                )
-                for company in items
-            ],
-            count=total_count,
-        )
+        return items, total_count
 
     async def get_company_by_id(self, company_id: int, current_user: int):
         query = (

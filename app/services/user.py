@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from fastapi import UploadFile
 
 from app.db.unit_of_work import UnitOfWork
+from app.schemas.response_models import ListResponse
 from app.utils.password import password_services
 from app.core.exceptions.user_exceptions import (
     AppException,
@@ -60,10 +61,24 @@ class UserServices:
     async def get_all_users(limit: int | None = None, offset: int | None = None):
         async with UnitOfWork() as uow:
             try:
-                users = await uow.users.get_all_users(limit, offset)
-                logger.info("Fetched users")
-                logger.info(users)
-                return users
+                items, total_count = await uow.users.get_all_users(limit, offset)
+                return ListResponse[UserDetailResponse](
+                    items=[
+                        UserDetailResponse(
+                            id=user.id,
+                            username=user.username,
+                            email=user.email,
+                            about=user.about,
+                            avatar=(
+                                f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                                if user.avatar_ext
+                                else None
+                            ),
+                        )
+                        for user in items
+                    ],
+                    count=total_count,
+                )
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")

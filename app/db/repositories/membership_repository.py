@@ -1,10 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete, and_, update, select
 
-from app.core.enums.role_enum import RoleEnum
+from app.core.enums.enums import RoleEnum
 from app.db.repositories.base_repository import BaseRepository
 from app.models.membership_model import Memberships
-from app.schemas.membership import MembershipDetailResponse
 
 
 class MembershipRepository(BaseRepository[Memberships]):
@@ -22,7 +21,7 @@ class MembershipRepository(BaseRepository[Memberships]):
         row = result.scalar_one_or_none()
         if not row:
             return None
-        return MembershipDetailResponse.model_validate(row)
+        return row
 
     async def delete_membership(self, user_id: int, company_id: int):
         await self.session.execute(

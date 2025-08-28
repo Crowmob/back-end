@@ -1,6 +1,7 @@
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, Header, UploadFile, File, Form, Body
+from fastapi import APIRouter, Header, UploadFile, File, Form, Body, Depends
 
 from app.services.auth_services.auth0 import auth0_user_services
 from app.utils.token import token_services
@@ -16,15 +17,12 @@ logger = logging.getLogger(__name__)
 async def auth_user(
     avatar: UploadFile = File(None),
     name: str = Form(...),
-    authorization: str = Header(...),
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
 ):
-    token = authorization.removeprefix("Bearer ")
-    data = await token_services.get_data_from_token(token)
     user_id, filepath = await auth0_user_services.auth_user(
         name,
         avatar,
-        data["email"],
-        data["sub"],
+        email,
     )
     return ResponseModel(
         status_code=200,

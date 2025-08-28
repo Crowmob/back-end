@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Header
+from typing import Annotated
 
 from app.schemas.response_models import MeResponseModel, AuthResponseModel
 from app.schemas.user import SignUpRequestModel, SignInRequestModel
@@ -27,10 +28,10 @@ async def login(data: SignInRequestModel = Depends()):
 
 
 @basic_auth_router.get("/me", response_model=MeResponseModel)
-async def get_me(authorization: str = Header(...)):
-    token = authorization.removeprefix("Bearer ")
-    data = await token_services.get_data_from_token(token)
-    if not data:
+async def get_me(
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)],
+):
+    if not email:
         raise UnauthorizedException(detail="Invalid token.")
-    user = await basic_auth_services.get_me(data["email"])
+    user = await basic_auth_services.get_me(email)
     return MeResponseModel(status_code=200, me=user)

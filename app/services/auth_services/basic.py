@@ -17,6 +17,7 @@ class BasicAuthServices:
         if password_services.check_password(password, user.password):
             token = token_services.create_access_token(user.id)
             return token
+        return None
 
     @staticmethod
     async def get_me(email: str):

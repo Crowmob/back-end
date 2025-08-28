@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, func, and_, Select
 
-from app.core.enums.role_enum import RoleEnum
+from app.core.enums.enums import RoleEnum
 from app.models.user_model import User
 from app.models.membership_model import Memberships
 from app.schemas.user import (
@@ -23,23 +23,9 @@ class UserRepository(BaseRepository[User]):
         rows = result.all()
 
         if not rows:
-            return ListResponse[UserDetailResponse](items=[], count=0)
+            return None
 
-        total_count = rows[0][2]
-        items = [
-            MemberDetailResponse(
-                id=user.id,
-                username=user.username,
-                email=user.email,
-                about=user.about,
-                role=role,
-                avatar=f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
-                if user.avatar_ext
-                else None,
-            )
-            for user, role, _ in rows
-        ]
-        return ListResponse[MemberDetailResponse](items=items, count=total_count)
+        return rows
 
     async def get_all_users(self, limit: int | None = None, offset: int | None = None):
         items, total_count = await super().get_all(
@@ -47,24 +33,7 @@ class UserRepository(BaseRepository[User]):
             limit=limit,
             offset=offset,
         )
-
-        return ListResponse[UserDetailResponse](
-            items=[
-                UserDetailResponse(
-                    id=user.id,
-                    username=user.username,
-                    email=user.email,
-                    about=user.about,
-                    avatar=(
-                        f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
-                        if user.avatar_ext
-                        else None
-                    ),
-                )
-                for user in items
-            ],
-            count=total_count,
-        )
+        return items, total_count
 
     async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
         result = await self.session.execute(select(User).where(User.email == email))
@@ -102,23 +71,7 @@ class UserRepository(BaseRepository[User]):
             offset=None,
         )
 
-        return ListResponse[UserDetailResponse](
-            items=[
-                UserDetailResponse(
-                    id=user.id,
-                    username=user.username,
-                    email=user.email,
-                    about=user.about,
-                    avatar=(
-                        f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
-                        if user.avatar_ext
-                        else None
-                    ),
-                )
-                for user in items
-            ],
-            count=total_count,
-        )
+        return items, total_count
 
     async def get_all_admins(
         self, company_id: int, limit: int | None = None, offset: int | None = None

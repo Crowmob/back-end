@@ -3,6 +3,9 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.unit_of_work import UnitOfWork
+from app.schemas.response_models import ListResponse
+from app.schemas.user import MemberDetailResponse
+from app.utils.settings_model import settings
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +37,27 @@ class AdminServices:
     ):
         async with UnitOfWork() as uow:
             try:
-                return await uow.users.get_all_admins(company_id, limit, offset)
+                result = await uow.users.get_users_in_company(company_id, limit, offset)
+                if not result:
+                    return ListResponse[MemberDetailResponse](items=[], count=0)
+
+                total_count = result[0][2]
+                items = [
+                    MemberDetailResponse(
+                        id=user.id,
+                        username=user.username,
+                        email=user.email,
+                        about=user.about,
+                        role=role,
+                        avatar=f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                        if user.avatar_ext
+                        else None,
+                    )
+                    for user, role, _ in result
+                ]
+                return ListResponse[MemberDetailResponse](
+                    items=items, count=total_count
+                )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise

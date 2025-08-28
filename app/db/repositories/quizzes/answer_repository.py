@@ -9,20 +9,11 @@ from app.models.quiz_model import (
     Records,
     Quiz,
 )
-from app.schemas.quiz import AnswerDetailResponse
 
 
 class AnswerRepository(BaseRepository[Answer]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, Answer)
-
-    async def get_all_answers(self, question_id: int):
-        result = await self.session.execute(
-            select(Answer).where(Answer.question_id == question_id)
-        )
-        rows = result.scalars().all()
-
-        return [AnswerDetailResponse.model_validate(row) for row in rows]
 
     async def create_selected_answers(self, record_id: int, data: list[int]):
         selected_answers = [

@@ -18,7 +18,13 @@ from app.schemas.quiz import (
     RecordCreateSchema,
     QuizParticipantUpdateSchema,
     QuizSubmitRequest,
+    QuizWithQuestionsDetailResponse,
+    QuestionWithAnswersDetailResponse,
+    AnswerDetailResponse,
+    QuizDetailResponse,
+    QuizParticipantDetailResponse,
 )
+from app.schemas.response_models import ListResponse
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +79,26 @@ class QuizServices:
     async def get_quiz_by_id(quiz_id: int, company_id: int):
         async with UnitOfWork() as uow:
             try:
-                return await uow.quizzes.get_quiz_by_id(quiz_id, company_id)
+                quiz = await uow.quizzes.get_quiz_by_id(quiz_id, company_id)
+                return QuizWithQuestionsDetailResponse(
+                    id=quiz.id,
+                    title=quiz.title,
+                    description=quiz.description or "",
+                    frequency=quiz.frequency,
+                    questions=[
+                        QuestionWithAnswersDetailResponse(
+                            id=q.id,
+                            text=q.text,
+                            answers=[
+                                AnswerDetailResponse(
+                                    id=a.id, text=a.text, is_correct=a.is_correct
+                                )
+                                for a in q.answers
+                            ],
+                        )
+                        for q in quiz.questions
+                    ],
+                )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise
@@ -87,9 +112,25 @@ class QuizServices:
     ):
         async with UnitOfWork() as uow:
             try:
-                return await uow.quizzes.get_all_quizzes(
+                quizzes = await uow.quizzes.get_all_quizzes(
                     company_id, user_id, limit, offset
                 )
+                if not quizzes:
+                    return ListResponse[QuizDetailResponse](items=[], count=0)
+
+                total_count = quizzes[0][5]
+                items = [
+                    QuizDetailResponse(
+                        id=quiz.id,
+                        title=quiz.title,
+                        description=quiz.description,
+                        frequency=quiz.frequency,
+                        is_available=quiz.is_available,
+                    )
+                    for quiz in quizzes
+                ]
+
+                return ListResponse[QuizDetailResponse](items=items, count=total_count)
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise
@@ -128,10 +169,10 @@ class QuizServices:
     async def quiz_submit(data: QuizSubmitRequest):
         async with UnitOfWork() as uow:
             try:
-                participant = await uow.participants.get_quiz_participant(
+                result = await uow.participants.get_quiz_participant(
                     data.quiz_id, data.user_id
                 )
-                if not participant:
+                if not result:
                     participant_id = await uow.participants.create(
                         QuizParticipantCreateSchema(
                             quiz_id=data.quiz_id, user_id=data.user_id
@@ -139,6 +180,7 @@ class QuizServices:
                     )
                     logger.info(f"Created quiz participant")
                 else:
+                    participant = QuizParticipantDetailResponse.model_validate(result)
                     participant_id = participant.id
                     await uow.participants.update(
                         participant_id,
@@ -228,9 +270,19 @@ class QuizServices:
                     ]
                 )
 
-                quiz_data = await uow.quizzes.get_full_quiz_data_for_user(
+                result = await uow.quizzes.get_full_quiz_data_for_user(
                     [answer["answer_id"] for answer in answers]
                 )
+                quiz_data = [
+                    {
+                        "quiz_title": answer.quiz_title,
+                        "quiz_description": answer.quiz_description,
+                        "question_text": answer.question_text,
+                        "answer_text": answer.answer_text,
+                        "is_correct": answer.is_correct,
+                    }
+                    for answer in result
+                ]
                 logger.info(quiz_data)
                 return quiz_data
             except SQLAlchemyError as e:

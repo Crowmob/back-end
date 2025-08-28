@@ -3,7 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import String, ForeignKey
 
 from app.models.base import Base, IDMixin, TimestampMixin
-from app.core.enums.role_enum import RoleEnum
+from app.core.enums.enums import RoleEnum
 
 
 class Memberships(Base, IDMixin, TimestampMixin):

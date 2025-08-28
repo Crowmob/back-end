@@ -8,8 +8,13 @@ from app.core.exceptions.company_exceptions import (
     AppException,
 )
 from app.models.membership_model import RoleEnum
-from app.schemas.company import CompanyUpdateRequestModel, CompanySchema
+from app.schemas.company import (
+    CompanyUpdateRequestModel,
+    CompanySchema,
+    CompanyDetailResponse,
+)
 from app.schemas.membership import MembershipSchema
+from app.schemas.response_models import ListResponse
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +48,21 @@ class CompanyServices:
     ):
         async with UnitOfWork() as uow:
             try:
-                companies = await uow.companies.get_all_companies(
+                items, total_count = await uow.companies.get_all_companies(
                     limit, offset, current_user
+                )
+                companies = ListResponse[CompanyDetailResponse](
+                    items=[
+                        CompanyDetailResponse(
+                            id=company.id,
+                            owner=company.owner,
+                            name=company.name,
+                            description=company.description,
+                            private=company.private,
+                        )
+                        for company in items
+                    ],
+                    count=total_count,
                 )
                 logger.info("Fetched companies")
                 logger.info(companies)

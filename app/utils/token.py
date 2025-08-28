@@ -2,6 +2,8 @@ import httpx
 import logging
 
 from datetime import datetime, timedelta
+
+from fastapi import Header
 from jose import JWTError, jwt
 from jose import jwk as jose_jwk
 from fastapi.security import HTTPBearer
@@ -62,13 +64,14 @@ class TokenServices:
             logger.error("Incorrect claims")
             raise UnauthorizedException(detail="Incorrect claims.")
 
-    async def get_data_from_token(self, token: str):
+    async def get_data_from_token(self, authorization: str = Header(...)):
+        token = authorization.removeprefix("Bearer ")
         if token:
             data = await self.decode_auth0_token(token)
         else:
-            data = {"sub": "|"}
+            return None
         logger.info(data)
-        return data
+        return data["email"]
 
     @staticmethod
     def create_access_token(id: int):

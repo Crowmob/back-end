@@ -3,8 +3,6 @@ from sqlalchemy import select, func, and_, delete
 
 from app.db.repositories.base_repository import BaseRepository
 from app.models.membership_model import MembershipRequests
-from app.schemas.membership import MembershipRequestDetailResponse
-from app.schemas.response_models import ListResponse
 from app.models.company_model import Company
 
 
@@ -48,19 +46,7 @@ class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
             limit=limit,
             offset=offset,
         )
-
-        return ListResponse[MembershipRequestDetailResponse](
-            items=[
-                MembershipRequestDetailResponse(
-                    id=request.id,
-                    type=request.type,
-                    company_id=request.company_id,
-                    user_id=request.user_id,
-                )
-                for request in items
-            ],
-            count=total_count,
-        )
+        return items
 
     async def get_membership_requests_to_company(
         self,
@@ -87,16 +73,6 @@ class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
         rows = result.all()
 
         if not rows:
-            return ListResponse[MembershipRequestDetailResponse](items=[], count=0)
+            return None
 
-        total_count = rows[0][1]
-        items = [
-            MembershipRequestDetailResponse(
-                id=req.id, type=req.type, company_id=req.company_id, user_id=req.user_id
-            )
-            for req, _ in rows
-        ]
-
-        return ListResponse[MembershipRequestDetailResponse](
-            items=items, count=total_count
-        )
+        return rows

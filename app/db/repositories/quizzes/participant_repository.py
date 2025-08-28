@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories.base_repository import BaseRepository
 from app.models.quiz_model import QuizParticipant
-from app.schemas.quiz import QuizParticipantDetailResponse
 
 
 class QuizParticipantRepository(BaseRepository[QuizParticipant]):
@@ -22,4 +21,4 @@ class QuizParticipantRepository(BaseRepository[QuizParticipant]):
         participant = result.scalar_one_or_none()
         if not participant:
             return None
-        return QuizParticipantDetailResponse.model_validate(participant)
+        return participant

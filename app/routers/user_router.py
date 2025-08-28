@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Header, Form, UploadFile, File
 
 from app.services.user import user_services
@@ -13,11 +15,12 @@ user_router = APIRouter(tags=["User CRUD"], prefix="/users")
 
 
 @user_router.get("/{user_id}", response_model=UserDetailResponse)
-async def get_user_by_id_endpoint(user_id: int, authorization: str = Header(...)):
-    token = authorization.removeprefix("Bearer ")
-    data = await token_services.get_data_from_token(token)
+async def get_user_by_id_endpoint(
+    user_id: int,
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)],
+):
     user_data = await user_services.get_user_by_id(user_id)
-    if data["email"] == user_data.email:
+    if email == user_data.email:
         user_data.current_user = True
     return user_data
 
