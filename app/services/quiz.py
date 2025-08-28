@@ -1,10 +1,10 @@
-import csv
 import datetime
 import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.exceptions.quiz_exceptions import NotFoundByIdException
+from app.core.exceptions.user_exceptions import AppException
 from app.db.redis_init import get_redis_client
 from app.db.repositories.redis.quiz_redis_repository import QuizRedisRepository
 from app.db.unit_of_work import UnitOfWork
@@ -223,23 +223,35 @@ class QuizServices:
                 raise
 
     @staticmethod
-    async def get_average_score_in_company(user_id: int, company_id: int):
+    async def get_average_score_in_company(
+        company_id: int, from_date: datetime.date, to_date: datetime.date
+    ):
         async with UnitOfWork() as uow:
             try:
-                score = await uow.records.get_average_score_in_company(
-                    user_id, company_id
+                if from_date and to_date and from_date > to_date:
+                    raise AppException(detail="Start date must be before end date")
+                scores = await uow.records.get_average_score_in_company(
+                    company_id, from_date, to_date
                 )
-                return score
+                logger.info(scores)
+                return scores
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise
 
     @staticmethod
-    async def get_average_score_in_system(user_id: int):
+    async def get_average_score_in_system(
+        user_id: int, from_date: datetime.date, to_date: datetime.date
+    ):
         async with UnitOfWork() as uow:
             try:
-                score = await uow.records.get_average_score_in_system(user_id)
-                return score
+                if from_date and to_date and from_date > to_date:
+                    raise AppException(detail="Start date must be before end date")
+                scores = await uow.records.get_average_score_in_system(
+                    user_id, from_date, to_date
+                )
+                logger.info(scores)
+                return scores
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise

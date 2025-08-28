@@ -1,3 +1,4 @@
+import datetime
 import json
 
 import pytest
@@ -106,10 +107,14 @@ async def test_get_average_score_in_company(
     test_record,
     quiz_services_fixture,
 ):
-    score = await quiz_services_fixture.get_average_score_in_company(
-        user_id=test_user["id"], company_id=test_company["id"]
+    from_date = datetime.date.today() - datetime.timedelta(days=1)
+    to_date = datetime.date.today() + datetime.timedelta(days=1)
+
+    scores = await quiz_services_fixture.get_average_score_in_company(
+        company_id=test_company["id"], from_date=from_date, to_date=to_date
     )
-    assert score == 50
+    assert scores[0] == 50
+    assert len(scores[1]) == 1
 
 
 @pytest.mark.asyncio
@@ -122,10 +127,14 @@ async def test_get_average_score_in_system(
     test_record,
     quiz_services_fixture,
 ):
-    score = await quiz_services_fixture.get_average_score_in_system(
-        user_id=test_user["id"]
+    from_date = datetime.date.today() - datetime.timedelta(days=1)
+    to_date = datetime.date.today() + datetime.timedelta(days=1)
+
+    scores = await quiz_services_fixture.get_average_score_in_system(
+        user_id=test_user["id"], from_date=from_date, to_date=to_date
     )
-    assert score == 50
+    assert scores[0] == 50
+    assert len(scores[1]) == 1
 
 
 @pytest.mark.asyncio

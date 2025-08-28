@@ -76,7 +76,7 @@ class CompanyRepository(BaseRepository[Company]):
 
     async def get_companies_by_ids(self, ids: list[int]):
         if not ids:
-            return ListResponse[CompanyDetailResponse](items=[], count=0)
+            return [], 0
         items, total_count = await super().get_all(
             filters={"id": ids} if ids else {},
             limit=None,

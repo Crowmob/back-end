@@ -1,6 +1,5 @@
 import pytest
 
-from fastapi.security import HTTPAuthorizationCredentials
 from unittest.mock import patch, AsyncMock
 
 from app.utils.token import token_services
@@ -22,13 +21,13 @@ def test_create_and_decode_token():
 @pytest.mark.asyncio
 @patch("app.utils.token.TokenServices.decode_auth0_token")
 async def test_get_data_from_token(mock_decode):
-    mock_decode.return_value = {"id": 1}
+    mock_decode.return_value = {"id": 1, "email": "test@mail.com"}
 
     token = token_services.create_access_token(1)
-    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
+    authorization_header = f"Bearer {token}"
 
-    data = await token_services.get_data_from_token(credentials)
-    assert data["id"] == 1
+    data = await token_services.get_data_from_token(authorization_header)
+    assert data == "test@mail.com"
 
 
 @pytest.mark.asyncio

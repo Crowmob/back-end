@@ -64,7 +64,7 @@ class UserRepository(BaseRepository[User]):
 
     async def get_users_by_ids(self, ids: list[int]):
         if not ids:
-            return ListResponse[UserDetailResponse](items=[], count=0)
+            return [], 0
         items, total_count = await super().get_all(
             filters={"id": ids} if ids else {},
             limit=None,

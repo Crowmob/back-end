@@ -161,21 +161,21 @@ class MembershipServices:
                     membership_requests = ListResponse[MembershipRequestDetailResponse](
                         items=[], count=0
                     )
+                else:
+                    total_count = result[0][1]
+                    items = [
+                        MembershipRequestDetailResponse(
+                            id=req.id,
+                            type=req.type,
+                            company_id=req.company_id,
+                            user_id=req.user_id,
+                        )
+                        for req, _ in result
+                    ]
 
-                total_count = result[0][1]
-                items = [
-                    MembershipRequestDetailResponse(
-                        id=req.id,
-                        type=req.type,
-                        company_id=req.company_id,
-                        user_id=req.user_id,
+                    membership_requests = ListResponse[MembershipRequestDetailResponse](
+                        items=items, count=total_count
                     )
-                    for req, _ in result
-                ]
-
-                membership_requests = ListResponse[MembershipRequestDetailResponse](
-                    items=items, count=total_count
-                )
                 user_ids = [request.user_id for request in membership_requests.items]
                 items, total_count = await uow.users.get_users_by_ids(user_ids)
                 return ListResponse[UserDetailResponse](
