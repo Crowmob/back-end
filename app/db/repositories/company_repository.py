@@ -4,10 +4,6 @@ from sqlalchemy import func, and_, or_
 
 from app.models.company_model import Company
 from app.models.membership_model import Memberships
-from app.schemas.company import (
-    CompanyDetailResponse,
-)
-from app.schemas.response_models import ListResponse
 from app.db.repositories.base_repository import BaseRepository
 
 
@@ -39,20 +35,8 @@ class CompanyRepository(BaseRepository[Company]):
             result = await self.session.execute(query)
             rows = result.all()
 
-            if not rows:
-                return ListResponse[CompanyDetailResponse](items=[], count=0)
-
             total_count = rows[0].total_count
-            items = [
-                CompanyDetailResponse(
-                    id=company.id,
-                    owner=company.owner,
-                    name=company.name,
-                    description=company.description,
-                    private=company.private,
-                )
-                for company, _ in rows
-            ]
+            items = [row[0] for row in rows]
         return items, total_count
 
     async def get_companies_for_user(

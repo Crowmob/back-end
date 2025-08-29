@@ -15,17 +15,12 @@ logger = logging.getLogger(__name__)
 
 class Auth0UserServices:
     @staticmethod
-    async def auth_user(name: str, avatar: UploadFile | None, email: str, sub: str):
-        sub = sub.split("|")
-        auth_provider = sub[0]
-        oauth_id = sub[1]
+    async def auth_user(name: str, avatar: UploadFile | None, email: str):
         if avatar:
             ext = avatar.filename.split(".")[-1]
         else:
             ext = None
-        user_id = await user_services.create_user(
-            name, email, None, auth_provider, oauth_id, ext
-        )
+        user_id = await user_services.create_user(name, email, None, ext)
         filepath = None
         if ext:
             filename = f"{user_id}.{ext}"

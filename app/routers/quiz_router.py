@@ -1,11 +1,7 @@
-import csv
-from io import StringIO
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Body
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import APIRouter, Depends, Body, Query
 
-from app.core.enums.enums import FileFormat
 from app.core.exceptions.auth_exceptions import UnauthorizedException
 from app.schemas.quiz import (
     GetAllQuizzesRequest,
@@ -13,6 +9,7 @@ from app.schemas.quiz import (
     QuizWithQuestionsSchema,
     QuizSubmitRequest,
     QuizWithQuestionsDetailResponse,
+    QuizAverageResponse,
 )
 from app.schemas.response_models import ListResponse, ResponseModel
 from app.services.export_service import export_service
@@ -125,3 +122,8 @@ async def export_single_quiz_data_for_user_in_company(
         )
     else:
         raise UnauthorizedException(detail="Unauthorized")
+
+
+@quiz_router.get("/score/", response_model=QuizAverageResponse)
+async def get_average_score_for_user():
+    return await quiz_services.get_average_score_in_system(447, None, None)

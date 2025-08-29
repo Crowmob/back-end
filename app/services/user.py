@@ -27,8 +27,6 @@ class UserServices:
         username: str | None,
         email: str,
         password: str | None,
-        auth_provider: str | None,
-        oauth_id: str | None,
         avatar_ext: str | None = None,
     ):
         async with UnitOfWork() as uow:
@@ -117,7 +115,8 @@ class UserServices:
                     logger.warning(f"No user found with email={email}")
                     raise UserWithEmailNotFoundException(email)
                 logger.info(f"Fetched user with email={email}")
-                return user
+
+                return UserDetailResponse.model_validate(user)
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")

@@ -5,12 +5,6 @@ from sqlalchemy import update, func, and_, Select
 from app.core.enums.enums import RoleEnum
 from app.models.user_model import User
 from app.models.membership_model import Memberships
-from app.schemas.user import (
-    UserDetailResponse,
-    MemberDetailResponse,
-)
-from app.schemas.response_models import ListResponse
-from app.utils.settings_model import settings
 from app.db.repositories.base_repository import BaseRepository
 
 
@@ -35,11 +29,11 @@ class UserRepository(BaseRepository[User]):
         )
         return items, total_count
 
-    async def get_user_by_email(self, email: int) -> UserDetailResponse | None:
+    async def get_user_by_email(self, email: int):
         result = await self.session.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if user:
-            return UserDetailResponse.model_validate(user)
+            return user
         return None
 
     async def delete_user(self, user_id: int) -> None:

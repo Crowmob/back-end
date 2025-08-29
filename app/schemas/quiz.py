@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -137,3 +137,14 @@ class QuizSubmitRequest(BaseModel):
     user_id: int
     company_id: int
     questions: list[QuestionID]
+
+
+class QuizScoreItem(BaseModel):
+    quiz_id: int
+    average_score: float
+    completed_at: datetime
+
+
+class QuizAverageResponse(BaseModel):
+    overall_average: float
+    scores: list[QuizScoreItem]

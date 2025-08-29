@@ -23,6 +23,8 @@ from app.schemas.quiz import (
     AnswerDetailResponse,
     QuizDetailResponse,
     QuizParticipantDetailResponse,
+    QuizAverageResponse,
+    QuizScoreItem,
 )
 from app.schemas.response_models import ListResponse
 
@@ -241,7 +243,7 @@ class QuizServices:
 
     @staticmethod
     async def get_average_score_in_system(
-        user_id: int, from_date: datetime.date, to_date: datetime.date
+        user_id: int, from_date: datetime.date = None, to_date: datetime.date = None
     ):
         async with UnitOfWork() as uow:
             try:
@@ -251,7 +253,17 @@ class QuizServices:
                     user_id, from_date, to_date
                 )
                 logger.info(scores)
-                return scores
+                return QuizAverageResponse(
+                    overall_average=float(scores[0]),
+                    scores=[
+                        QuizScoreItem(
+                            quiz_id=quiz_id,
+                            average_score=float(avg),
+                            completed_at=completed_at,
+                        )
+                        for quiz_id, avg, completed_at in scores[1]
+                    ],
+                )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise

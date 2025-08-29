@@ -1,5 +1,3 @@
-import json
-
 from app.db.repositories.redis.base_redis_repository import BaseRedisRepository
 
 
