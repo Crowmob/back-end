@@ -46,7 +46,7 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
         ],
     )
     quiz_id = await quiz_services_fixture.create_quiz(
-        company_id=test_company["id"], quiz_id=None, quiz=quiz1
+        company_id=test_company["id"], quiz_id="null", quiz=quiz1
     )
     assert isinstance(quiz_id, int)
 
@@ -55,7 +55,7 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
 async def test_get_all_quizzes(db_session, quiz_services_fixture, test_quiz):
     quizzes = await quiz_services_fixture.get_all_quizzes(
         company_id=test_quiz["company_id"],
-        user_id=test_quiz["user_id"],
+        email=test_quiz["user_email"],
         limit=5,
         offset=0,
     )
@@ -214,7 +214,7 @@ async def test_get_all_quizzes_data_for_user_in_company(
     await db_session.commit()
 
     data = await quiz_services_fixture.get_quiz_data_for_user(
-        test_user["id"], company_id=test_company["id"]
+        test_user["email"], user_id=test_user["id"], company_id=test_company["id"]
     )
 
     assert len(data) == 2
@@ -254,7 +254,10 @@ async def test_get_quiz_data_for_user_in_company(
     await db_session.commit()
 
     data = await quiz_services_fixture.get_quiz_data_for_user(
-        test_user["id"], quiz_id=test_quiz["id"], company_id=test_company["id"]
+        test_user["email"],
+        user_id=test_user["id"],
+        quiz_id=test_quiz["id"],
+        company_id=test_company["id"],
     )
 
     assert len(data) == 2
@@ -293,6 +296,8 @@ async def test_all_quizzes_data_for_user(
     db_session.add(selected_answer)
     await db_session.commit()
 
-    data = await quiz_services_fixture.get_quiz_data_for_user(test_user["id"])
+    data = await quiz_services_fixture.get_quiz_data_for_user(
+        test_user["email"], user_id=test_user["id"]
+    )
 
     assert len(data) == 2

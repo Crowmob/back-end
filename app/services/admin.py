@@ -2,8 +2,9 @@ import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.exceptions.exceptions import AppException
 from app.db.unit_of_work import UnitOfWork
-from app.schemas.response_models import ListResponse
+from app.schemas.response_models import ListResponse, ResponseModel
 from app.schemas.user import MemberDetailResponse
 from app.utils.settings_model import settings
 
@@ -29,7 +30,7 @@ class AdminServices:
                 logger.info(f"Removed admin with id {user_id}")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException("Database exception occurred.")
 
     @staticmethod
     async def get_all_admins(
@@ -60,7 +61,8 @@ class AdminServices:
                 )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException("Database exception occurred.")
 
 
-admin_services = AdminServices()
+def get_admin_service() -> AdminServices:
+    return AdminServices()
