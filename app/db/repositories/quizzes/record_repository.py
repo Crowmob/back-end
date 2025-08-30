@@ -12,7 +12,11 @@ class RecordsRepository(BaseRepository[Records]):
         super().__init__(session, Records)
 
     async def get_average_score_in_company(
-        self, company_id: int, from_date: date, to_date: date
+        self,
+        user_id: int,
+        company_id: int,
+        from_date: date | None = None,
+        to_date: date | None = None,
     ):
         total_questions_subquery = (
             select(Question.quiz_id, func.count(Question.id).label("total_questions"))
@@ -22,40 +26,49 @@ class RecordsRepository(BaseRepository[Records]):
             .subquery()
         )
 
-        user_score_subquery = (
+        user_scores_subquery = (
             select(
                 QuizParticipant.quiz_id,
-                QuizParticipant.user_id,
-                func.coalesce(func.sum(Records.score), 0).label("user_score"),
+                func.sum(Records.score).label("total_score"),
+                func.count(Records.id).label("record_count"),
                 QuizParticipant.completed_at,
             )
             .join(Records, Records.participant_id == QuizParticipant.id)
             .join(Quiz, Quiz.id == QuizParticipant.quiz_id)
             .where(
+                QuizParticipant.user_id == user_id,
                 Quiz.company_id == company_id,
-                QuizParticipant.completed_at >= from_date,
-                QuizParticipant.completed_at <= to_date,
             )
-            .group_by(
-                QuizParticipant.quiz_id,
-                QuizParticipant.completed_at,
-                QuizParticipant.user_id,
-            )
-            .subquery()
         )
 
+        if from_date:
+            user_scores_subquery = user_scores_subquery.where(
+                QuizParticipant.completed_at >= from_date
+            )
+        if to_date:
+            user_scores_subquery = user_scores_subquery.where(
+                QuizParticipant.completed_at <= to_date
+            )
+
+        user_scores_subquery = user_scores_subquery.group_by(
+            QuizParticipant.quiz_id, QuizParticipant.completed_at
+        ).subquery()
+
         query = select(
-            user_score_subquery.c.quiz_id,
-            user_score_subquery.c.user_id,
+            user_scores_subquery.c.quiz_id,
+            user_id,
             (
-                user_score_subquery.c.user_score
+                user_scores_subquery.c.total_score
+                / (
+                    user_scores_subquery.c.record_count
+                    * total_questions_subquery.c.total_questions
+                )
                 * 100
-                / total_questions_subquery.c.total_questions
             ).label("average_score"),
-            user_score_subquery.c.completed_at,
+            user_scores_subquery.c.completed_at,
         ).join(
             total_questions_subquery,
-            total_questions_subquery.c.quiz_id == user_score_subquery.c.quiz_id,
+            total_questions_subquery.c.quiz_id == user_scores_subquery.c.quiz_id,
         )
 
         result = await self.session.execute(query)
@@ -68,7 +81,7 @@ class RecordsRepository(BaseRepository[Records]):
         return [overall_average, scores]
 
     async def get_average_score_in_system(
-        self, user_id: int, from_date: date | None, to_date: date | None
+        self, user_id: int, from_date: date | None = None, to_date: date | None = None
     ):
         total_questions_subquery = (
             select(Question.quiz_id, func.count(Question.id).label("total_questions"))
@@ -76,10 +89,11 @@ class RecordsRepository(BaseRepository[Records]):
             .subquery()
         )
 
-        user_score_query = (
+        user_scores_subquery = (
             select(
                 QuizParticipant.quiz_id,
-                func.coalesce(func.sum(Records.score), 0).label("user_score"),
+                func.sum(Records.score).label("total_score"),
+                func.count(Records.id).label("record_count"),
                 QuizParticipant.completed_at,
             )
             .join(Records, Records.participant_id == QuizParticipant.id)
@@ -87,29 +101,32 @@ class RecordsRepository(BaseRepository[Records]):
         )
 
         if from_date:
-            user_score_query = user_score_query.where(
+            user_scores_subquery = user_scores_subquery.where(
                 QuizParticipant.completed_at >= from_date
             )
         if to_date:
-            user_score_query = user_score_query.where(
+            user_scores_subquery = user_scores_subquery.where(
                 QuizParticipant.completed_at <= to_date
             )
 
-        user_score_subquery = user_score_query.group_by(
+        user_scores_subquery = user_scores_subquery.group_by(
             QuizParticipant.quiz_id, QuizParticipant.completed_at
         ).subquery()
 
         query = select(
-            user_score_subquery.c.quiz_id,
+            user_scores_subquery.c.quiz_id,
             (
-                user_score_subquery.c.user_score
+                user_scores_subquery.c.total_score
+                / (
+                    user_scores_subquery.c.record_count
+                    * total_questions_subquery.c.total_questions
+                )
                 * 100
-                / total_questions_subquery.c.total_questions
             ).label("average_score"),
-            user_score_subquery.c.completed_at,
+            user_scores_subquery.c.completed_at,
         ).join(
             total_questions_subquery,
-            total_questions_subquery.c.quiz_id == user_score_subquery.c.quiz_id,
+            total_questions_subquery.c.quiz_id == user_scores_subquery.c.quiz_id,
         )
 
         result = await self.session.execute(query)
@@ -119,4 +136,5 @@ class RecordsRepository(BaseRepository[Records]):
             return [0, []]
 
         overall_average = sum(avg for _, avg, _ in scores) / len(scores)
+
         return [overall_average, scores]

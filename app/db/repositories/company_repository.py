@@ -35,6 +35,9 @@ class CompanyRepository(BaseRepository[Company]):
             result = await self.session.execute(query)
             rows = result.all()
 
+            if not rows:
+                return [], 0
+
             total_count = rows[0].total_count
             items = [row[0] for row in rows]
         return items, total_count

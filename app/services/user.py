@@ -9,11 +9,11 @@ from fastapi import UploadFile
 from app.db.unit_of_work import UnitOfWork
 from app.schemas.response_models import ListResponse
 from app.utils.password import password_services
-from app.core.exceptions.user_exceptions import (
+from app.core.exceptions.exceptions import (
     AppException,
-    UserWithIdNotFoundException,
-    UserWithEmailNotFoundException,
-    UserUpdateException,
+    NotFoundException,
+    AlreadyExistsException,
+    BadRequestException,
 )
 from app.utils.settings_model import settings
 from app.schemas.user import UserDetailResponse, UserUpdateRequestModel, UserSchema
@@ -41,19 +41,12 @@ class UserServices:
                 )
                 user_id = await uow.users.create(user.model_dump())
                 logger.info(f"User created: {username}")
-
+                return user_id
             except IntegrityError:
                 logger.warning(f"User with email {email} already exists.")
-                await uow.session.rollback()
-
-                user = await uow.users.get_user_by_email(email)
-                if not user:
-                    logger.error(f"User not found by email: {email}")
-                    raise UserWithEmailNotFoundException(email=email)
-
-                user_id = user.id
-
-            return user_id
+                raise AlreadyExistsException(
+                    detail=f"User with email {email} already exists."
+                )
 
     @staticmethod
     async def get_all_users(limit: int | None = None, offset: int | None = None):
@@ -80,7 +73,7 @@ class UserServices:
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
@@ -88,7 +81,7 @@ class UserServices:
             user = await uow.users.get_by_id(user_id)
             if not user:
                 logger.warning(f"No user found with id={user_id}")
-                raise UserWithIdNotFoundException(user_id)
+                raise NotFoundException(detail=f"No user found with id={user_id}")
             user_dict = user.__dict__.copy()
             if user_dict["avatar_ext"]:
                 user_dict["avatar"] = (
@@ -100,11 +93,14 @@ class UserServices:
 
         except SQLAlchemyError as e:
             logger.info(f"SQLAlchemy error: {e}")
-            raise
+            raise AppException(detail="Database exception occurred.")
 
-    async def get_user_by_id(self, user_id: int):
+    async def get_user_by_id(self, user_id: int, email: str):
         async with UnitOfWork() as uow:
-            return await self.get_user_by_id_with_uow(user_id, uow)
+            user_data = await self.get_user_by_id_with_uow(user_id, uow)
+            if email == user_data.email:
+                user_data.current_user = True
+            return user_data
 
     @staticmethod
     async def get_user_by_email(email: str):
@@ -113,14 +109,13 @@ class UserServices:
                 user = await uow.users.get_user_by_email(email)
                 if not user:
                     logger.warning(f"No user found with email={email}")
-                    raise UserWithEmailNotFoundException(email)
+                    raise NotFoundException(detail=f"No user found with email={email}")
                 logger.info(f"Fetched user with email={email}")
-
                 return UserDetailResponse.model_validate(user)
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     async def update_user(
         self,
@@ -166,7 +161,7 @@ class UserServices:
 
             except IntegrityError as e:
                 logger.error(f"Integrity error: {e}")
-                raise UserUpdateException(user_id)
+                raise BadRequestException(detail="Error updating user. Wrong data")
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
@@ -181,7 +176,8 @@ class UserServices:
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
 
-user_services = UserServices()
+def get_user_service() -> UserServices:
+    return UserServices()

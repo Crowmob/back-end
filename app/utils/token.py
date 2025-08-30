@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 from jose import jwk as jose_jwk
 from fastapi.security import HTTPBearer
 
-from app.core.exceptions.auth_exceptions import UnauthorizedException
+from app.core.exceptions.exceptions import UnauthorizedException
 from app.utils.settings_model import settings
 
 AUTH0_DOMAIN = settings.auth.AUTH0_DOMAIN

@@ -10,9 +10,8 @@ from app.schemas.company import (
     CompanyUpdateRequestModel,
 )
 from app.schemas.response_models import ResponseModel, ListResponse
-from app.services.company import company_services
+from app.services.company import get_company_service, CompanyServices
 from app.utils.token import token_services
-from app.services.user import user_services
 
 company_router = APIRouter(tags=["Company"], prefix="/company")
 
@@ -21,31 +20,26 @@ company_router = APIRouter(tags=["Company"], prefix="/company")
 async def get_all_companies(
     data: GetAllCompaniesRequest = Depends(),
     email: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
+    company_service: CompanyServices = Depends(get_company_service),
 ):
-    user_id = None
-    if email:
-        user = await user_services.get_user_by_email(email)
-        user_id = user.id
-    return await company_services.get_all_companies(data.limit, data.offset, user_id)
+    return await company_service.get_all_companies(data.limit, data.offset, email)
 
 
-@company_router.get("/{company_id}", response_model=CompanyDetailResponse | None)
+@company_router.get("/{company_id}", response_model=CompanyDetailResponse)
 async def get_company_by_id(
     company_id: int,
     email: Annotated[str | None, Depends(token_services.get_data_from_token)],
+    company_service: CompanyServices = Depends(get_company_service),
 ):
-    current_user = await user_services.get_user_by_email(email)
-    company = await company_services.get_company_by_id(company_id, current_user.id)
-    if company:
-        owner = await user_services.get_user_by_id(company.owner)
-        if current_user.email == owner.email:
-            company.is_owner = True
-    return company
+    return await company_service.get_company_by_id(company_id, email)
 
 
 @company_router.post("/", response_model=CompanyIdResponse)
-async def create_company(data: CompanySchema = Body()):
-    company_id = await company_services.create_company(
+async def create_company(
+    data: CompanySchema = Body(),
+    company_service: CompanyServices = Depends(get_company_service),
+):
+    company_id = await company_service.create_company(
         data.owner, data.name, data.description, data.private
     )
     return CompanyIdResponse(id=company_id)
@@ -56,14 +50,14 @@ async def update_company(
     company_id: int,
     data: CompanyUpdateRequestModel = Body(),
     email: Annotated[str | None, Depends(token_services.get_data_from_token)] = "",
+    company_service: CompanyServices = Depends(get_company_service),
 ):
-    current_user = await user_services.get_user_by_email(email)
-    await company_services.update_company(
+    await company_service.update_company(
         company_id,
         data.name,
         data.description,
         data.private,
-        current_user=current_user.id,
+        email,
     )
     return ResponseModel(status_code=200, message="Company updated successfully")
 
@@ -72,7 +66,7 @@ async def update_company(
 async def delete_company(
     company_id: int,
     email: Annotated[str | None, Depends(token_services.get_data_from_token)],
+    company_service: CompanyServices = Depends(get_company_service),
 ):
-    current_user = await user_services.get_user_by_email(email)
-    await company_services.delete_company(company_id, current_user.id)
+    await company_service.delete_company(company_id, email)
     return ResponseModel(status_code=200, message="Company deleted successfully")

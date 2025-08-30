@@ -1,10 +1,15 @@
 import datetime
 import logging
 
-from sqlalchemy.exc import SQLAlchemyError
+from redis.exceptions import RedisError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
-from app.core.exceptions.quiz_exceptions import NotFoundByIdException
-from app.core.exceptions.user_exceptions import AppException
+from app.core.exceptions.exceptions import (
+    AppException,
+    UnauthorizedException,
+    NotFoundException,
+    BadRequestException,
+)
 from app.db.redis_init import get_redis_client
 from app.db.repositories.redis.quiz_redis_repository import QuizRedisRepository
 from app.db.unit_of_work import UnitOfWork
@@ -34,10 +39,11 @@ logger = logging.getLogger(__name__)
 class QuizServices:
     @staticmethod
     async def create_quiz(
-        company_id: int, quiz_id: int | None, quiz: QuizWithQuestionsSchema
+        company_id: int, quiz_id: int | str, quiz: QuizWithQuestionsSchema
     ):
         async with UnitOfWork() as uow:
             try:
+                quiz_id = None if quiz_id == "null" else int(quiz_id)
                 if quiz_id is not None:
                     await uow.quizzes.delete(quiz_id)
                 quiz_id = await uow.quizzes.create(
@@ -75,13 +81,17 @@ class QuizServices:
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
-    async def get_quiz_by_id(quiz_id: int, company_id: int):
+    async def get_quiz_by_id(quiz_id: int, company_id: int, email: str | None):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 quiz = await uow.quizzes.get_quiz_by_id(quiz_id, company_id)
+                if not quiz:
+                    raise NotFoundException(detail="Quiz not found")
                 return QuizWithQuestionsDetailResponse(
                     id=quiz.id,
                     title=quiz.title,
@@ -103,19 +113,20 @@ class QuizServices:
                 )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def get_all_quizzes(
         company_id: int,
-        user_id: int,
+        email: str,
         limit: int | None = None,
         offset: int | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
+                user = await uow.users.get_user_by_email(email)
                 quizzes = await uow.quizzes.get_all_quizzes(
-                    company_id, user_id, limit, offset
+                    company_id, user.id, limit, offset
                 )
                 if not quizzes:
                     return ListResponse[QuizDetailResponse](items=[], count=0)
@@ -135,7 +146,7 @@ class QuizServices:
                 return ListResponse[QuizDetailResponse](items=items, count=total_count)
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def update_quiz(
@@ -145,17 +156,18 @@ class QuizServices:
             try:
                 quiz = await uow.quizzes.get_by_id(quiz_id)
                 if not quiz:
-                    raise NotFoundByIdException(
-                        detail=f"Quiz with ID {quiz_id} not found"
-                    )
+                    raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
                 update_model = QuizUpdateSchema(
                     title=title,
                     description=description,
                 )
                 await uow.quizzes.update(quiz_id, update_model.model_dump())
+            except IntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to update quiz. Wrong data")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def delete_quiz(quiz_id):
@@ -165,7 +177,7 @@ class QuizServices:
                 logger.info(f"Deleted quiz id: {quiz_id}")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def quiz_submit(data: QuizSubmitRequest):
@@ -222,24 +234,38 @@ class QuizServices:
                 return participant_id, record_id, answer_ids
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
+            except RedisError as e:
+                logger.error(f"RedisError: {e}")
+                raise AppException(detail="Redis exception occurred.")
 
     @staticmethod
     async def get_average_score_in_company(
-        company_id: int, from_date: datetime.date, to_date: datetime.date
+        user_id: int, company_id: int, from_date: datetime.date, to_date: datetime.date
     ):
         async with UnitOfWork() as uow:
             try:
                 if from_date and to_date and from_date > to_date:
                     raise AppException(detail="Start date must be before end date")
                 scores = await uow.records.get_average_score_in_company(
-                    company_id, from_date, to_date
+                    user_id, company_id, from_date, to_date
                 )
-                logger.info(scores)
-                return scores
+                response = QuizAverageResponse(
+                    overall_average=float(scores[0]),
+                    scores=[
+                        QuizScoreItem(
+                            quiz_id=quiz_id,
+                            average_score=float(average_score),
+                            completed_at=completed_at,
+                        )
+                        for quiz_id, average_score, completed_at in scores[1]
+                    ],
+                )
+                logger.info(response)
+                return response
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def get_average_score_in_system(
@@ -252,28 +278,34 @@ class QuizServices:
                 scores = await uow.records.get_average_score_in_system(
                     user_id, from_date, to_date
                 )
-                logger.info(scores)
-                return QuizAverageResponse(
+                response = QuizAverageResponse(
                     overall_average=float(scores[0]),
                     scores=[
                         QuizScoreItem(
                             quiz_id=quiz_id,
-                            average_score=float(avg),
+                            average_score=float(average_score),
                             completed_at=completed_at,
                         )
-                        for quiz_id, avg, completed_at in scores[1]
+                        for quiz_id, average_score, completed_at in scores[1]
                     ],
                 )
+                logger.info(response)
+                return response
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def get_quiz_data_for_user(
-        user_id: int, quiz_id: int = None, company_id: int = None
+        email: str, user_id: int = None, quiz_id: int = None, company_id: int = None
     ):
         async with UnitOfWork() as uow:
             try:
+                if email:
+                    user = await uow.users.get_user_by_email(email)
+                else:
+                    raise UnauthorizedException(detail="Unauthorized")
+                user_id = user_id if user_id is not None else user.id
                 quiz_redis_repo = QuizRedisRepository(get_redis_client())
                 answers = await quiz_redis_repo.get_answers_for_user(
                     user_id, quiz_id, company_id
@@ -311,7 +343,11 @@ class QuizServices:
                 return quiz_data
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
+            except RedisError as e:
+                logger.error(f"RedisError: {e}")
+                raise AppException(detail="Redis exception occurred.")
 
 
-quiz_services = QuizServices()
+def get_quiz_service() -> QuizServices:
+    return QuizServices()

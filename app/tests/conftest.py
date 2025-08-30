@@ -14,15 +14,15 @@ from app.models.quiz_model import (
     Records,
     SelectedAnswers,
 )
-from app.services.quiz import quiz_services
-from app.services.user import user_services
-from app.services.company import company_services
+from app.services.quiz import get_quiz_service
+from app.services.user import get_user_service
+from app.services.company import get_company_service
 from app.db.unit_of_work import UnitOfWork
 from app.utils.settings_model import settings
 from app.models.user_model import User
 from app.models.membership_model import Memberships, MembershipRequests, RoleEnum
-from app.services.admin import admin_services
-from app.services.membership import membership_services
+from app.services.admin import get_admin_service
+from app.services.membership import get_membership_service
 from app.utils.db import clear_tables
 
 
@@ -51,7 +51,7 @@ def user_services_fixture(db_session, monkeypatch):
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.user.UnitOfWork", unit_of_work_with_session)
-    return user_services
+    return get_user_service()
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def company_services_fixture(db_session, monkeypatch):
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.company.UnitOfWork", unit_of_work_with_session)
-    return company_services
+    return get_company_service()
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def membership_services_fixture(db_session, monkeypatch):
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.membership.UnitOfWork", unit_of_work_with_session)
-    return membership_services
+    return get_membership_service()
 
 
 @pytest.fixture
@@ -78,7 +78,7 @@ def admin_services_fixture(db_session, monkeypatch):
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.admin.UnitOfWork", unit_of_work_with_session)
-    return admin_services
+    return get_admin_service()
 
 
 @pytest.fixture
@@ -88,7 +88,7 @@ def quiz_services_fixture(db_session, redis_client, monkeypatch):
 
     monkeypatch.setattr("app.services.quiz.UnitOfWork", unit_of_work_with_session)
     monkeypatch.setattr("app.services.quiz.get_redis_client", lambda: redis_client)
-    return quiz_services
+    return get_quiz_service()
 
 
 @pytest_asyncio.fixture
@@ -112,7 +112,7 @@ async def test_company(db_session, test_user):
     )
     company_id = result.one()[0]
     await db_session.commit()
-    return {"id": company_id, "owner": test_user["id"]}
+    return {"id": company_id, "owner": test_user["id"], "email": test_user["email"]}
 
 
 @pytest_asyncio.fixture
@@ -145,6 +145,7 @@ async def test_membership(db_session, test_user, test_company):
         "user_id": test_user["id"],
         "company_id": test_company["id"],
         "owner": test_company["owner"],
+        "user_email": test_user["email"],
     }
 
 
@@ -233,6 +234,7 @@ async def test_quiz(db_session, test_company):
         "id": quiz_id,
         "company_id": test_company["id"],
         "user_id": test_company["owner"],
+        "user_email": test_company["email"],
     }
 
 

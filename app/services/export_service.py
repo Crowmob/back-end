@@ -35,4 +35,5 @@ class ExportService:
         return JSONResponse(content=data)
 
 
-export_service = ExportService()
+def get_export_service() -> ExportService:
+    return ExportService()

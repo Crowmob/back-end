@@ -2,9 +2,7 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.unit_of_work import UnitOfWork
-from app.core.exceptions.membership_exceptions import (
-    MembershipRequestNotFoundException,
-)
+from app.core.exceptions.exceptions import NotFoundException, AppException
 from app.core.enums.enums import RoleEnum
 from app.schemas.company import CompanyDetailResponse
 from app.schemas.membership import (
@@ -81,7 +79,7 @@ class MembershipServices:
                     )
                 )
                 if membership_request is None:
-                    raise MembershipRequestNotFoundException()
+                    raise NotFoundException(detail="Membership request not found")
                 await uow.membership_requests.delete_membership_request(
                     user_id, company_id
                 )
@@ -95,7 +93,7 @@ class MembershipServices:
                 return membership_id
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def delete_membership(user_id: int, company_id: int):
@@ -106,7 +104,7 @@ class MembershipServices:
                 )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def get_membership_requests_for_user(
@@ -141,7 +139,7 @@ class MembershipServices:
                 )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def get_membership_requests_to_company(
@@ -158,7 +156,7 @@ class MembershipServices:
                     )
                 )
                 if not result:
-                    membership_requests = ListResponse[MembershipRequestDetailResponse](
+                    return ListResponse[MembershipRequestDetailResponse](
                         items=[], count=0
                     )
                 else:
@@ -197,7 +195,7 @@ class MembershipServices:
                 )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def get_companies_for_user(
@@ -230,7 +228,7 @@ class MembershipServices:
                 )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException("Database exception occurred.")
 
     @staticmethod
     async def get_users_in_company(
@@ -261,7 +259,8 @@ class MembershipServices:
                 )
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
-                raise
+                raise AppException("Database exception occurred.")
 
 
-membership_services = MembershipServices()
+def get_membership_service() -> MembershipServices:
+    return MembershipServices()

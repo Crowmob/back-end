@@ -2,8 +2,8 @@ from datetime import datetime, date
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from app.core.exceptions.quiz_exceptions import QuizException
-from app.schemas.base import TimestampMixin, IDMixin
+from app.core.exceptions.exceptions import BadRequestException
+from app.schemas.base import IDMixin
 
 
 class QuizSchema(BaseModel):
@@ -33,7 +33,7 @@ class QuestionWithAnswersSchema(QuestionSchema, BaseModel):
     @model_validator(mode="after")
     def validate_answers(self) -> "QuestionWithAnswersSchema":
         if not (2 <= len(self.answers) <= 4):
-            raise QuizException(
+            raise BadRequestException(
                 detail="Number of answers in question must be more than 1 and less than 5"
             )
         return self
@@ -45,7 +45,7 @@ class QuizWithQuestionsSchema(QuizSchema, BaseModel):
     @model_validator(mode="after")
     def validate_questions(self) -> "QuizWithQuestionsSchema":
         if len(self.questions) < 2:
-            raise QuizException(detail="Quiz should have at least 2 questions")
+            raise BadRequestException(detail="Quiz should have at least 2 questions")
         return self
 
 
@@ -148,3 +148,8 @@ class QuizScoreItem(BaseModel):
 class QuizAverageResponse(BaseModel):
     overall_average: float
     scores: list[QuizScoreItem]
+
+
+class QuizAverageRequest(BaseModel):
+    from_date: date | None = None
+    till_date: date | None = None
