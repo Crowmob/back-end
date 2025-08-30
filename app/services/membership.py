@@ -2,7 +2,11 @@ import logging
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.unit_of_work import UnitOfWork
-from app.core.exceptions.exceptions import NotFoundException, AppException
+from app.core.exceptions.exceptions import (
+    NotFoundException,
+    AppException,
+    UnauthorizedException,
+)
 from app.core.enums.enums import RoleEnum
 from app.schemas.company import CompanyDetailResponse
 from app.schemas.membership import (
@@ -20,9 +24,13 @@ logger = logging.getLogger(__name__)
 
 class MembershipServices:
     @staticmethod
-    async def send_membership_request(request_type: str, company_id: int, user_id: int):
+    async def send_membership_request(
+        request_type: str, company_id: int, user_id: int, email: str | None
+    ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 membership_request = (
                     await uow.membership_requests.get_membership_request(
                         request_type, company_id, user_id
@@ -44,9 +52,11 @@ class MembershipServices:
                 raise
 
     @staticmethod
-    async def get_membership(user_id: int, company_id: int):
+    async def get_membership(user_id: int, company_id: int, email: str | None):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 result = await uow.memberships.get_membership(user_id, company_id)
                 if not result:
                     return None
@@ -56,9 +66,13 @@ class MembershipServices:
                 raise
 
     @staticmethod
-    async def cancel_membership_request(user_id: int, company_id: int):
+    async def cancel_membership_request(
+        user_id: int, company_id: int, email: str | None
+    ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 await uow.membership_requests.delete_membership_request(
                     user_id, company_id
                 )
@@ -69,10 +83,12 @@ class MembershipServices:
 
     @staticmethod
     async def accept_membership_request(
-        request_type: str, user_id: int, company_id: int
+        request_type: str, user_id: int, company_id: int, email: str | None
     ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 membership_request = (
                     await uow.membership_requests.get_membership_request(
                         request_type, company_id, user_id
@@ -96,9 +112,11 @@ class MembershipServices:
                 raise AppException(detail="Database exception occurred.")
 
     @staticmethod
-    async def delete_membership(user_id: int, company_id: int):
+    async def delete_membership(user_id: int, company_id: int, email: str | None):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 await uow.memberships.delete_membership(
                     user_id=user_id, company_id=company_id
                 )
@@ -112,18 +130,24 @@ class MembershipServices:
         user_id: int,
         limit: int | None = None,
         offset: int | None = None,
+        email: str | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 membership_requests = (
                     await uow.membership_requests.get_membership_requests_for_user(
                         request_type, user_id, limit, offset
                     )
                 )
                 company_ids = [request.company_id for request in membership_requests]
-                items, total_count = await uow.companies.get_companies_by_ids(
-                    company_ids
-                )
+                if not company_ids:
+                    items, total_count = [], 0
+                else:
+                    items, total_count = await uow.companies.get_companies_by_ids(
+                        company_ids
+                    )
                 return ListResponse[CompanyDetailResponse](
                     items=[
                         CompanyDetailResponse(
@@ -147,35 +171,37 @@ class MembershipServices:
         company_id: int,
         limit: int | None = None,
         offset: int | None = None,
+        email: str | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
-                result = (
-                    await uow.membership_requests.get_membership_requests_to_company(
-                        request_type, company_id, limit, offset
-                    )
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
+                (
+                    items,
+                    total_count,
+                ) = await uow.membership_requests.get_membership_requests_to_company(
+                    request_type, company_id, limit, offset
                 )
-                if not result:
-                    return ListResponse[MembershipRequestDetailResponse](
-                        items=[], count=0
-                    )
 
-                total_count = result[0][1]
-                items = [
+                membership_requests = [
                     MembershipRequestDetailResponse(
                         id=req.id,
                         type=req.type,
                         company_id=req.company_id,
                         user_id=req.user_id,
                     )
-                    for req, _ in result
+                    for req in items
                 ]
 
                 membership_requests = ListResponse[MembershipRequestDetailResponse](
-                    items=items, count=total_count
+                    items=membership_requests, count=total_count
                 )
                 user_ids = [request.user_id for request in membership_requests.items]
-                items, total_count = await uow.users.get_users_by_ids(user_ids)
+                if not user_ids:
+                    items, total_count = [], 0
+                else:
+                    items, total_count = await uow.users.get_users_by_ids(user_ids)
                 return ListResponse[UserDetailResponse](
                     items=[
                         UserDetailResponse(
@@ -199,17 +225,18 @@ class MembershipServices:
 
     @staticmethod
     async def get_companies_for_user(
-        user_id: int, limit: int | None = None, offset: int | None = None
+        user_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
+        email: str | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
-                result = await uow.companies.get_companies_for_user(
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
+                items, total_count = await uow.companies.get_companies_for_user(
                     user_id, limit, offset
                 )
-                if not result:
-                    return ListResponse[CompanyDetailResponse](items=[], count=0)
-
-                total_count = result[0][2]
 
                 items = [
                     CompanyDetailResponse(
@@ -220,7 +247,7 @@ class MembershipServices:
                         private=company.private,
                         user_role=role,
                     )
-                    for company, role, _ in result
+                    for company, role in items
                 ]
 
                 return ListResponse[CompanyDetailResponse](
@@ -232,15 +259,19 @@ class MembershipServices:
 
     @staticmethod
     async def get_users_in_company(
-        company_id: int, limit: int | None = None, offset: int | None = None
+        company_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
+        email: str | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
-                result = await uow.users.get_users_in_company(company_id, limit, offset)
-                if not result:
-                    return ListResponse[MemberDetailResponse](items=[], count=0)
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
+                items, total_count = await uow.users.get_users_in_company(
+                    company_id, limit, offset
+                )
 
-                total_count = result[0][2]
                 items = [
                     MemberDetailResponse(
                         id=user.id,
@@ -252,7 +283,7 @@ class MembershipServices:
                         if user.avatar_ext
                         else None,
                     )
-                    for user, role, _ in result
+                    for user, role in items
                 ]
                 return ListResponse[MemberDetailResponse](
                     items=items, count=total_count

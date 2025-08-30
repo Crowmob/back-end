@@ -3,7 +3,7 @@ import os
 import glob
 import aiofiles
 
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError, DataError
 from fastapi import UploadFile
 
 from app.db.unit_of_work import UnitOfWork
@@ -12,8 +12,9 @@ from app.utils.password import password_services
 from app.core.exceptions.exceptions import (
     AppException,
     NotFoundException,
-    AlreadyExistsException,
+    ConflictException,
     BadRequestException,
+    UnauthorizedException,
 )
 from app.utils.settings_model import settings
 from app.schemas.user import UserDetailResponse, UserUpdateRequestModel, UserSchema
@@ -44,9 +45,15 @@ class UserServices:
                 return user_id
             except IntegrityError:
                 logger.warning(f"User with email {email} already exists.")
-                raise AlreadyExistsException(
+                raise ConflictException(
                     detail=f"User with email {email} already exists."
                 )
+            except DataError:
+                logger.error(f"Data Error: {e}")
+                raise BadRequestException(detail=f"invalid format or length of fields")
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemy error: {e}")
+                raise AppException(detail="Database exception occurred")
 
     @staticmethod
     async def get_all_users(limit: int | None = None, offset: int | None = None):
@@ -95,8 +102,10 @@ class UserServices:
             logger.info(f"SQLAlchemy error: {e}")
             raise AppException(detail="Database exception occurred.")
 
-    async def get_user_by_id(self, user_id: int, email: str):
+    async def get_user_by_id(self, user_id: int, email: str | None):
         async with UnitOfWork() as uow:
+            if not email:
+                raise UnauthorizedException(detail="Unauthorized")
             user_data = await self.get_user_by_id_with_uow(user_id, uow)
             if email == user_data.email:
                 user_data.current_user = True
@@ -162,7 +171,9 @@ class UserServices:
             except IntegrityError as e:
                 logger.error(f"Integrity error: {e}")
                 raise BadRequestException(detail="Error updating user. Wrong data")
-
+            except DataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise AppException(detail="Database exception occurred.")

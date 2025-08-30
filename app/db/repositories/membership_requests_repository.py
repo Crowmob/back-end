@@ -73,6 +73,9 @@ class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
         rows = result.all()
 
         if not rows:
-            return None
+            return [], 0
 
-        return rows
+        total_count = rows[0][1]
+        items = [row[0] for row in rows]
+
+        return items, total_count

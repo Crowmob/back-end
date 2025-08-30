@@ -2,7 +2,11 @@ import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.exceptions.exceptions import AppException
+from app.core.exceptions.exceptions import (
+    AppException,
+    NotFoundException,
+    UnauthorizedException,
+)
 from app.db.unit_of_work import UnitOfWork
 from app.schemas.response_models import ListResponse, ResponseModel
 from app.schemas.user import MemberDetailResponse
@@ -13,20 +17,32 @@ logger = logging.getLogger(__name__)
 
 class AdminServices:
     @staticmethod
-    async def appoint_admin(user_id: int, company_id: int):
+    async def appoint_admin(user_id: int, company_id: int, email: str | None):
         async with UnitOfWork() as uow:
             try:
-                await uow.memberships.appoint_admin(user_id, company_id)
+                if not email:
+                    raise UnauthorizedException(detail=f"Unauthorized")
+                result = await uow.memberships.appoint_admin(user_id, company_id)
+                if result.rowcount == 0:
+                    raise NotFoundException(
+                        detail=f"User with id {user_id} is not member of company with id {company_id}"
+                    )
                 logger.info(f"Appointed admin with id {user_id}")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise
 
     @staticmethod
-    async def remove_admin(user_id: int, company_id: int):
+    async def remove_admin(user_id: int, company_id: int, email: str | None):
         async with UnitOfWork() as uow:
             try:
-                await uow.memberships.remove_admin(user_id, company_id)
+                if not email:
+                    raise UnauthorizedException(detail=f"Unauthorized")
+                result = await uow.memberships.remove_admin(user_id, company_id)
+                if result.rowcount == 0:
+                    raise NotFoundException(
+                        detail=f"User with id {user_id} is not member of company with id {company_id}"
+                    )
                 logger.info(f"Removed admin with id {user_id}")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
@@ -34,15 +50,19 @@ class AdminServices:
 
     @staticmethod
     async def get_all_admins(
-        company_id: int, limit: int | None = None, offset: int | None = None
+        company_id: int,
+        limit: int | None = None,
+        offset: int | None = None,
+        email: str | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
-                result = await uow.users.get_users_in_company(company_id, limit, offset)
-                if not result:
-                    return ListResponse[MemberDetailResponse](items=[], count=0)
+                if not email:
+                    raise UnauthorizedException(detail=f"Unauthorized")
+                items, total_count = await uow.users.get_all_admins(
+                    company_id, limit, offset
+                )
 
-                total_count = result[0][2]
                 items = [
                     MemberDetailResponse(
                         id=user.id,
@@ -54,7 +74,7 @@ class AdminServices:
                         if user.avatar_ext
                         else None,
                     )
-                    for user, role, _ in result
+                    for user, role in items
                 ]
                 return ListResponse[MemberDetailResponse](
                     items=items, count=total_count

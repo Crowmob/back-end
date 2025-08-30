@@ -14,10 +14,6 @@ from app.schemas.response_models import ResponseModel, ListResponse
 user_router = APIRouter(tags=["User CRUD"], prefix="/users")
 
 
-class UserService:
-    pass
-
-
 @user_router.get("/{user_id}", response_model=UserDetailResponse)
 async def get_user_by_id_endpoint(
     user_id: int,

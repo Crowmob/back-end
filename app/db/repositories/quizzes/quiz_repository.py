@@ -80,9 +80,12 @@ class QuizRepository(BaseRepository[Quiz]):
         rows = result.all()
 
         if not rows:
-            return None
+            return [], 0
 
-        return rows
+        total_count = rows[0][5]
+        items = [row for row in rows]
+
+        return items, total_count
 
     async def get_full_quiz_data_for_user(self, selected_answer_ids: list[int]):
         query = (

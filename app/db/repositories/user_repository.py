@@ -12,15 +12,6 @@ class UserRepository(BaseRepository[User]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, User)
 
-    async def return_members(self, query: Select):
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return None
-
-        return rows
-
     async def get_all_users(self, limit: int | None = None, offset: int | None = None):
         items, total_count = await super().get_all(
             filters={"has_profile": True},
@@ -54,11 +45,18 @@ class UserRepository(BaseRepository[User]):
             .offset(offset or 0)
         )
 
-        return await self.return_members(query)
+        result = await self.session.execute(query)
+        rows = result.all()
+
+        if not rows:
+            return [], 0
+
+        total_count = rows[0][2]
+        items = [[row[0], row[1]] for row in rows]
+
+        return items, total_count
 
     async def get_users_by_ids(self, ids: list[int]):
-        if not ids:
-            return [], 0
         items, total_count = await super().get_all(
             filters={"id": ids} if ids else {},
             limit=None,
@@ -83,4 +81,13 @@ class UserRepository(BaseRepository[User]):
             .offset(offset or 0)
         )
 
-        return await self.return_members(query)
+        result = await self.session.execute(query)
+        rows = result.all()
+
+        if not rows:
+            return [], 0
+
+        total_count = rows[0][2]
+        items = [[row[0], row[1]] for row in rows]
+
+        return items, total_count
