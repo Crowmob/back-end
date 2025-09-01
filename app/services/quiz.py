@@ -2,13 +2,16 @@ import datetime
 import logging
 
 from redis.exceptions import RedisError
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DataError
 
+from app.core.enums.enums import RoleEnum
 from app.core.exceptions.exceptions import (
     AppException,
     UnauthorizedException,
     NotFoundException,
     BadRequestException,
+    ConflictException,
+    ForbiddenException,
 )
 from app.db.redis_init import get_redis_client
 from app.db.repositories.redis.quiz_redis_repository import QuizRedisRepository
@@ -39,10 +42,15 @@ logger = logging.getLogger(__name__)
 class QuizServices:
     @staticmethod
     async def create_quiz(
-        company_id: int, quiz_id: int | str, quiz: QuizWithQuestionsSchema
+        company_id: int,
+        quiz_id: int | str,
+        quiz: QuizWithQuestionsSchema,
+        email: str | None,
     ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 quiz_id = None if quiz_id == "null" else int(quiz_id)
                 if quiz_id is not None:
                     await uow.quizzes.delete(quiz_id)
@@ -78,6 +86,10 @@ class QuizServices:
 
                 logger.info(f"Created quiz id: {quiz_id}")
                 return quiz_id
+
+            except DataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
@@ -117,21 +129,22 @@ class QuizServices:
 
     @staticmethod
     async def get_all_quizzes(
-        company_id: int,
-        email: str,
+        company_id: int | None,
+        email: str | None,
         limit: int | None = None,
         offset: int | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 user = await uow.users.get_user_by_email(email)
-                quizzes = await uow.quizzes.get_all_quizzes(
-                    company_id, user.id, limit, offset
+                if not user:
+                    raise ConflictException(detail="Authenticated user does not exist")
+                items, total_count = await uow.quizzes.get_all_quizzes(
+                    user.id, company_id, limit=limit, offset=offset
                 )
-                if not quizzes:
-                    return ListResponse[QuizDetailResponse](items=[], count=0)
 
-                total_count = quizzes[0][5]
                 items = [
                     QuizDetailResponse(
                         id=quiz.id,
@@ -139,8 +152,9 @@ class QuizServices:
                         description=quiz.description,
                         frequency=quiz.frequency,
                         is_available=quiz.is_available,
+                        last_completed_at=quiz.last_completed_at,
                     )
-                    for quiz in quizzes
+                    for quiz in items
                 ]
 
                 return ListResponse[QuizDetailResponse](items=items, count=total_count)
@@ -165,14 +179,22 @@ class QuizServices:
             except IntegrityError as e:
                 logger.error(f"IntegrityError: {e}")
                 raise BadRequestException(detail="Failed to update quiz. Wrong data")
+            except DataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise AppException(detail="Database exception occurred.")
 
     @staticmethod
-    async def delete_quiz(quiz_id):
+    async def delete_quiz(quiz_id, email: str | None):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
+                quiz = await uow.quizzes.get_by_id(quiz_id)
+                if not quiz:
+                    raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
                 await uow.quizzes.delete(quiz_id)
                 logger.info(f"Deleted quiz id: {quiz_id}")
             except SQLAlchemyError as e:
@@ -180,9 +202,21 @@ class QuizServices:
                 raise AppException(detail="Database exception occurred.")
 
     @staticmethod
-    async def quiz_submit(data: QuizSubmitRequest):
+    async def quiz_submit(data: QuizSubmitRequest, email: str | None):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
+
+                current_user = await uow.users.get_user_by_email(email)
+                if not current_user:
+                    raise ConflictException(detail="Authenticated user does not exist")
+
+                if current_user.id != data.user_id:
+                    raise ForbiddenException(
+                        detail="You cannot submit a quiz for another user"
+                    )
+
                 result = await uow.participants.get_quiz_participant(
                     data.quiz_id, data.user_id
                 )
@@ -232,6 +266,9 @@ class QuizServices:
                 await quiz_redis_repo.save_answers(answers_data)
 
                 return participant_id, record_id, answer_ids
+            except IntegrityError as e:
+                logger.warning(f"Invalid quiz submission data: {e}")
+                raise BadRequestException(detail="Invalid quiz submission data")
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise AppException(detail="Database exception occurred.")
@@ -241,12 +278,31 @@ class QuizServices:
 
     @staticmethod
     async def get_average_score_in_company(
-        user_id: int, company_id: int, from_date: datetime.date, to_date: datetime.date
+        user_id: int,
+        company_id: int,
+        from_date: datetime.date,
+        to_date: datetime.date,
+        email: str | None,
     ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
+                current_user = await uow.users.get_user_by_email(email)
+                if not current_user:
+                    raise ConflictException(detail="Authenticated user does not exist")
+                membership = await uow.memberships.get_membership(user_id, company_id)
+                if (
+                    membership.role != RoleEnum.ADMIN
+                    and membership.role != RoleEnum.OWNER
+                ):
+                    raise ForbiddenException(
+                        detail="You dont have permissions for this"
+                    )
                 if from_date and to_date and from_date > to_date:
-                    raise AppException(detail="Start date must be before end date")
+                    raise BadRequestException(
+                        detail="Start date must be before end date"
+                    )
                 scores = await uow.records.get_average_score_in_company(
                     user_id, company_id, from_date, to_date
                 )
@@ -258,7 +314,7 @@ class QuizServices:
                             average_score=float(average_score),
                             completed_at=completed_at,
                         )
-                        for quiz_id, average_score, completed_at in scores[1]
+                        for quiz_id, _, average_score, completed_at in scores[1]
                     ],
                 )
                 logger.info(response)
@@ -269,10 +325,15 @@ class QuizServices:
 
     @staticmethod
     async def get_average_score_in_system(
-        user_id: int, from_date: datetime.date = None, to_date: datetime.date = None
+        user_id: int,
+        from_date: datetime.date = None,
+        to_date: datetime.date = None,
+        email: str | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 if from_date and to_date and from_date > to_date:
                     raise AppException(detail="Start date must be before end date")
                 scores = await uow.records.get_average_score_in_system(
@@ -282,11 +343,12 @@ class QuizServices:
                     overall_average=float(scores[0]),
                     scores=[
                         QuizScoreItem(
-                            quiz_id=quiz_id,
+                            title=title,
+                            description=description,
                             average_score=float(average_score),
                             completed_at=completed_at,
                         )
-                        for quiz_id, average_score, completed_at in scores[1]
+                        for title, description, completed_at, average_score in scores[1]
                     ],
                 )
                 logger.info(response)
@@ -303,6 +365,10 @@ class QuizServices:
             try:
                 if email:
                     user = await uow.users.get_user_by_email(email)
+                    if not user:
+                        raise ConflictException(
+                            detail="Authenticated user does not exist"
+                        )
                 else:
                     raise UnauthorizedException(detail="Unauthorized")
                 user_id = user_id if user_id is not None else user.id

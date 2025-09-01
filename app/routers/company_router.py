@@ -38,9 +38,10 @@ async def get_company_by_id(
 async def create_company(
     data: CompanySchema = Body(),
     company_service: CompanyServices = Depends(get_company_service),
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
 ):
     company_id = await company_service.create_company(
-        data.owner, data.name, data.description, data.private
+        data.owner, data.name, data.description, data.private, email
     )
     return CompanyIdResponse(id=company_id)
 

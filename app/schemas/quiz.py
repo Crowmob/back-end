@@ -55,6 +55,7 @@ class QuestionDetailResponse(IDMixin, QuestionSchema, BaseModel):
 
 class QuizDetailResponse(IDMixin, QuizSchema, BaseModel):
     is_available: bool
+    last_completed_at: datetime
 
 
 class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
@@ -114,7 +115,7 @@ class QuizParticipantUpdateSchema(BaseModel):
 
 
 class GetAllQuizzesRequest(BaseModel):
-    company_id: int
+    company_id: int | None = None
     limit: int | None = None
     offset: int | None = None
 
@@ -140,7 +141,8 @@ class QuizSubmitRequest(BaseModel):
 
 
 class QuizScoreItem(BaseModel):
-    quiz_id: int
+    title: str
+    description: str | None = None
     average_score: float
     completed_at: datetime
 

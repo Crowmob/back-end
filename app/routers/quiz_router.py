@@ -36,9 +36,10 @@ async def get_average_score_for_user(
     user_id: int,
     data: QuizAverageRequest = Depends(),
     quiz_service: QuizServices = Depends(get_quiz_service),
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
 ):
     return await quiz_service.get_average_score_in_system(
-        user_id, data.from_date, data.till_date
+        user_id, data.from_date, data.till_date, email
     )
 
 
@@ -48,9 +49,10 @@ async def get_average_score_for_user_in_company(
     company_id: int,
     data: QuizAverageRequest = Depends(),
     quiz_service: QuizServices = Depends(get_quiz_service),
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
 ):
     return await quiz_service.get_average_score_in_company(
-        user_id, company_id, data.from_date, data.till_date
+        user_id, company_id, data.from_date, data.till_date, email
     )
 
 
@@ -72,8 +74,9 @@ async def create_quiz(
     quiz_id: int | str,
     data: QuizWithQuestionsSchema = Body(...),
     quiz_service: QuizServices = Depends(get_quiz_service),
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
 ):
-    await quiz_service.create_quiz(company_id, quiz_id, data)
+    await quiz_service.create_quiz(company_id, quiz_id, data, email)
     return ResponseModel(status_code=200, message="Created quiz")
 
 
@@ -81,16 +84,19 @@ async def create_quiz(
 async def quiz_submit(
     data: QuizSubmitRequest = Body(...),
     quiz_service: QuizServices = Depends(get_quiz_service),
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
 ):
-    await quiz_service.quiz_submit(data)
+    await quiz_service.quiz_submit(data, email)
     return ResponseModel(status_code=200, message="Submitted quiz")
 
 
 @quiz_router.delete("/{quiz_id}", response_model=ResponseModel)
 async def delete_quiz(
-    quiz_id: int, quiz_service: QuizServices = Depends(get_quiz_service)
+    quiz_id: int,
+    quiz_service: QuizServices = Depends(get_quiz_service),
+    email: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
 ):
-    await quiz_service.delete_quiz(quiz_id)
+    await quiz_service.delete_quiz(quiz_id, email)
     return ResponseModel(status_code=200, message="Deleted quiz")
 
 

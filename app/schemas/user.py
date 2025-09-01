@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, HttpUrl
 from pydantic.generics import GenericModel
 
@@ -58,4 +60,5 @@ class MemberDetailResponse(IDMixin, TimestampMixin, BaseModel):
     avatar: str | None = None
     role: str | None = None
     current_user: bool | None = False
+    last_completed_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)

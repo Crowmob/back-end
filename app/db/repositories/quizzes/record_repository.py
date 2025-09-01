@@ -92,9 +92,9 @@ class RecordsRepository(BaseRepository[Records]):
         user_scores_subquery = (
             select(
                 QuizParticipant.quiz_id,
+                QuizParticipant.completed_at,
                 func.sum(Records.score).label("total_score"),
                 func.count(Records.id).label("record_count"),
-                QuizParticipant.completed_at,
             )
             .join(Records, Records.participant_id == QuizParticipant.id)
             .where(QuizParticipant.user_id == user_id)
@@ -113,20 +113,28 @@ class RecordsRepository(BaseRepository[Records]):
             QuizParticipant.quiz_id, QuizParticipant.completed_at
         ).subquery()
 
-        query = select(
-            user_scores_subquery.c.quiz_id,
-            (
-                user_scores_subquery.c.total_score
-                / (
-                    user_scores_subquery.c.record_count
-                    * total_questions_subquery.c.total_questions
-                )
-                * 100
-            ).label("average_score"),
-            user_scores_subquery.c.completed_at,
-        ).join(
-            total_questions_subquery,
-            total_questions_subquery.c.quiz_id == user_scores_subquery.c.quiz_id,
+        query = (
+            select(
+                Quiz.title,
+                Quiz.description,
+                user_scores_subquery.c.completed_at,
+                (
+                    user_scores_subquery.c.total_score
+                    / (
+                        user_scores_subquery.c.record_count
+                        * total_questions_subquery.c.total_questions
+                    )
+                    * 100
+                ).label("average_score"),
+            )
+            .join(
+                user_scores_subquery,
+                user_scores_subquery.c.quiz_id == Quiz.id,
+            )
+            .join(
+                total_questions_subquery,
+                total_questions_subquery.c.quiz_id == Quiz.id,
+            )
         )
 
         result = await self.session.execute(query)
@@ -135,6 +143,6 @@ class RecordsRepository(BaseRepository[Records]):
         if not scores:
             return [0, []]
 
-        overall_average = sum(avg for _, avg, _ in scores) / len(scores)
+        overall_average = sum(row.average_score for row in scores) / len(scores)
 
         return [overall_average, scores]

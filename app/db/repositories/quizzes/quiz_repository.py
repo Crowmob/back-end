@@ -41,48 +41,74 @@ class QuizRepository(BaseRepository[Quiz]):
 
     async def get_all_quizzes(
         self,
-        company_id: int,
         user_id: int,
+        company_id: int | None = None,
         limit: int | None = None,
         offset: int | None = None,
     ):
+        last_completion_all_subq = (
+            select(
+                QuizParticipant.quiz_id,
+                func.max(QuizParticipant.completed_at).label("last_completed_at"),
+            )
+            .group_by(QuizParticipant.quiz_id)
+            .subquery()
+        )
+
+        last_completion_user_subq = (
+            select(
+                QuizParticipant.quiz_id,
+                func.max(QuizParticipant.completed_at).label("user_last_completed"),
+            )
+            .where(QuizParticipant.user_id == user_id)
+            .group_by(QuizParticipant.quiz_id)
+            .subquery()
+        )
+
         query = (
             select(
                 Quiz.id,
                 Quiz.title,
                 Quiz.description,
                 Quiz.frequency,
-                QuizParticipant.completed_at,
+                last_completion_all_subq.c.last_completed_at,
                 func.count().over().label("total_count"),
                 case(
                     (
-                        QuizParticipant.completed_at != None,
+                        last_completion_user_subq.c.user_last_completed != None,
                         func.now()
-                        >= QuizParticipant.completed_at
+                        >= last_completion_user_subq.c.user_last_completed
                         + cast(Quiz.frequency, Integer) * text("INTERVAL '1 day'"),
                     ),
                     else_=True,
                 ).label("is_available"),
             )
             .outerjoin(
-                QuizParticipant,
-                and_(
-                    QuizParticipant.quiz_id == Quiz.id,
-                    QuizParticipant.user_id == user_id,
-                ),
+                last_completion_all_subq, last_completion_all_subq.c.quiz_id == Quiz.id
             )
-            .where(Quiz.company_id == company_id)
-            .limit(limit or 5)
-            .offset(offset or 0)
+            .outerjoin(
+                last_completion_user_subq,
+                last_completion_user_subq.c.quiz_id == Quiz.id,
+            )
         )
+
+        # Add conditional filter
+        if company_id is not None:
+            query = query.where(Quiz.company_id == company_id)
+
+        # Apply pagination
+        query = query.limit(limit or 5).offset(offset or 0)
 
         result = await self.session.execute(query)
         rows = result.all()
 
         if not rows:
-            return None
+            return [], 0
 
-        return rows
+        total_count = rows[0][5]
+        items = [row for row in rows]
+
+        return items, total_count
 
     async def get_full_quiz_data_for_user(self, selected_answer_ids: list[int]):
         query = (

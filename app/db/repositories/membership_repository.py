@@ -33,7 +33,7 @@ class MembershipRepository(BaseRepository[Memberships]):
         )
 
     async def appoint_admin(self, user_id: int, company_id: int):
-        await self.session.execute(
+        result = await self.session.execute(
             update(Memberships)
             .values(role=RoleEnum.ADMIN)
             .where(
@@ -42,9 +42,10 @@ class MembershipRepository(BaseRepository[Memberships]):
                 )
             )
         )
+        return result
 
     async def remove_admin(self, user_id: int, company_id: int):
-        await self.session.execute(
+        result = await self.session.execute(
             update(Memberships)
             .values(role=RoleEnum.MEMBER)
             .where(
@@ -53,3 +54,4 @@ class MembershipRepository(BaseRepository[Memberships]):
                 )
             )
         )
+        return result

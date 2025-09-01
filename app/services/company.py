@@ -1,5 +1,5 @@
 import logging
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DataError
 
 from app.db.unit_of_work import UnitOfWork
 from app.core.exceptions.exceptions import (
@@ -7,6 +7,7 @@ from app.core.exceptions.exceptions import (
     BadRequestException,
     AppException,
     UnauthorizedException,
+    ConflictException,
 )
 from app.models.membership_model import RoleEnum
 from app.schemas.company import (
@@ -27,9 +28,12 @@ class CompanyServices:
         name: str,
         description: str | None = None,
         private: bool | None = True,
+        email: str | None = None,
     ):
         async with UnitOfWork() as uow:
             try:
+                if not email:
+                    raise UnauthorizedException(detail="Unauthorized")
                 company = CompanySchema(
                     owner=owner, name=name, description=description, private=private
                 )
@@ -41,6 +45,11 @@ class CompanyServices:
                 await uow.memberships.create(membership.model_dump())
                 logger.info(f"Company created: {name}")
                 return company_id
+
+            except DataError as e:
+                logger.warning(f"Invalid data: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise AppException("Database exception occurred.")
@@ -57,9 +66,17 @@ class CompanyServices:
                     user = await uow.users.get_user_by_email(email)
                 else:
                     user = None
-                items, total_count = await uow.companies.get_all_companies(
-                    limit, offset, None if not user else user.id
-                )
+                if user:
+                    (
+                        items,
+                        total_count,
+                    ) = await uow.companies.get_all_companies_for_owner(
+                        limit, offset, user.id
+                    )
+                else:
+                    items, total_count = await uow.companies.get_all(
+                        filters={"private": False}, limit=limit, offset=offset
+                    )
                 companies = ListResponse[CompanyDetailResponse](
                     items=[
                         CompanyDetailResponse(
@@ -76,6 +93,7 @@ class CompanyServices:
                 logger.info("Fetched companies")
                 logger.info(companies)
                 return companies
+
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")
                 raise AppException("Database exception occurred.")
@@ -87,6 +105,8 @@ class CompanyServices:
         try:
             if email:
                 current_user = await uow.users.get_user_by_email(email)
+                if not current_user:
+                    raise ConflictException(detail="Authenticated user does not exist")
             else:
                 raise UnauthorizedException(detail="Unauthorized")
             result = await uow.companies.get_company_by_id(company_id, current_user.id)
@@ -138,6 +158,10 @@ class CompanyServices:
                 raise BadRequestException(
                     detail=f"Failed to update company with id={company_id}. Wrong data"
                 )
+
+            except DataError as e:
+                logger.warning(f"Data error: {e}")
+                raise BadRequestException(detail=f"Invalid format or length of fields")
 
             except SQLAlchemyError as e:
                 logger.error(f"SQLAlchemy error: {e}")

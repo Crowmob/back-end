@@ -32,11 +32,26 @@ class BaseRepository(Generic[ModelType]):
 
     async def get_all(
         self,
-        filters: dict[str, int | bool] | None = None,
+        filters: dict[str, int | bool | list] | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        extra_filters: list = None,
+        joins: list[tuple] = None,
+        outer_joins: list[tuple] = None,
+        extra_columns: list = None,
     ):
-        query = select(self.model, func.count().over().label("total_count"))
+        query = select(
+            self.model, *(extra_columns or []), func.count().over().label("total_count")
+        )
+
+        if joins:
+            for join_args in joins:
+                query = query.join(*join_args)
+
+        if outer_joins:
+            for join_args in outer_joins:
+                query = query.outerjoin(*join_args)
+
         if filters:
             for field, value in filters.items():
                 column = getattr(self.model, field)
@@ -44,6 +59,10 @@ class BaseRepository(Generic[ModelType]):
                     query = query.where(column.in_(value))
                 else:
                     query = query.where(column == value)
+
+        if extra_filters:
+            for condition in extra_filters:
+                query = query.where(condition)
 
         query = query.offset(offset or 0).limit(limit or 10)
 
@@ -53,8 +72,8 @@ class BaseRepository(Generic[ModelType]):
         if not rows:
             return [], 0
 
-        total_count = rows[0].total_count
-        items = [row[0] for row in rows]
+        total_count = rows[0][-1]
+        items = [row[:-1] for row in rows]
 
         return items, total_count
 

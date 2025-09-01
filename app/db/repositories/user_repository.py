@@ -3,6 +3,7 @@ from sqlalchemy.future import select
 from sqlalchemy import update, func, and_, Select
 
 from app.core.enums.enums import RoleEnum
+from app.models.quiz_model import QuizParticipant
 from app.models.user_model import User
 from app.models.membership_model import Memberships
 from app.db.repositories.base_repository import BaseRepository
@@ -11,15 +12,6 @@ from app.db.repositories.base_repository import BaseRepository
 class UserRepository(BaseRepository[User]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, User)
-
-    async def return_members(self, query: Select):
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return None
-
-        return rows
 
     async def get_all_users(self, limit: int | None = None, offset: int | None = None):
         items, total_count = await super().get_all(
@@ -43,22 +35,28 @@ class UserRepository(BaseRepository[User]):
             .values(**{"about": None, "has_profile": False})
         )
 
-    async def get_users_in_company(
-        self, company_id: int, limit: int | None = None, offset: int | None = None
-    ):
-        query = (
-            select(User, Memberships.role, func.count().over().label("total_count"))
-            .join(Memberships, User.id == Memberships.user_id)
-            .filter(Memberships.company_id == company_id)
-            .limit(limit or 5)
-            .offset(offset or 0)
+    async def get_users_in_company(self, company_id: int, limit=None, offset=None):
+        last_quiz_subq = (
+            select(
+                QuizParticipant.user_id,
+                func.max(QuizParticipant.completed_at).label("last_quiz_time"),
+            )
+            .group_by(QuizParticipant.user_id)
+            .subquery()
         )
 
-        return await self.return_members(query)
+        items, total = await super().get_all(
+            limit=limit,
+            offset=offset,
+            joins=[(Memberships, User.id == Memberships.user_id)],
+            outer_joins=[(last_quiz_subq, last_quiz_subq.c.user_id == User.id)],
+            extra_filters=[Memberships.company_id == company_id],
+            extra_columns=[Memberships.role, last_quiz_subq.c.last_quiz_time],
+        )
+
+        return items, total
 
     async def get_users_by_ids(self, ids: list[int]):
-        if not ids:
-            return [], 0
         items, total_count = await super().get_all(
             filters={"id": ids} if ids else {},
             limit=None,
@@ -67,20 +65,16 @@ class UserRepository(BaseRepository[User]):
 
         return items, total_count
 
-    async def get_all_admins(
-        self, company_id: int, limit: int | None = None, offset: int | None = None
-    ):
-        query = (
-            select(User, Memberships.role, func.count().over().label("total_count"))
-            .join(
-                Memberships,
-                and_(
-                    User.id == Memberships.user_id, Memberships.role == RoleEnum.ADMIN
-                ),
-            )
-            .filter(Memberships.company_id == company_id)
-            .limit(limit or 5)
-            .offset(offset or 0)
+    async def get_all_admins(self, company_id: int, limit=None, offset=None):
+        items, total = await super().get_all(
+            limit=limit,
+            offset=offset,
+            joins=[(Memberships, User.id == Memberships.user_id)],
+            extra_filters=[
+                Memberships.company_id == company_id,
+                Memberships.role == RoleEnum.ADMIN,
+            ],
+            extra_columns=[Memberships.role],
         )
 
-        return await self.return_members(query)
+        return items, total
