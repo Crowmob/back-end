@@ -10,9 +10,7 @@ class BasicAuthServices:
         self.user_service = user_service
 
     async def register(self, username: str, email: str, password: str):
-        user_id = await self.user_service.create_user(
-            username, email, password, None, None
-        )
+        user_id = await self.user_service.create_user(username, email, password, None)
         token = token_services.create_access_token(user_id)
         return AuthResponseModel(
             status_code=200, message="Registered successfully!", token=token
@@ -24,12 +22,6 @@ class BasicAuthServices:
             token = token_services.create_access_token(user.id)
             return AuthResponseModel(status_code=200, message="Logged in", token=token)
         raise UnauthorizedException(detail="Wrong password.")
-
-    async def get_me(self, email: str | None):
-        if not email:
-            raise UnauthorizedException(detail="Invalid token.")
-        user = await self.user_service.get_user_by_email(email)
-        return MeResponseModel(status_code=200, me=user)
 
 
 def get_basic_auth_service() -> BasicAuthServices:

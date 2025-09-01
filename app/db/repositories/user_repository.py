@@ -37,22 +37,13 @@ class UserRepository(BaseRepository[User]):
     async def get_users_in_company(
         self, company_id: int, limit: int | None = None, offset: int | None = None
     ):
-        query = (
-            select(User, Memberships.role, func.count().over().label("total_count"))
-            .join(Memberships, User.id == Memberships.user_id)
-            .filter(Memberships.company_id == company_id)
-            .limit(limit or 5)
-            .offset(offset or 0)
+        items, total_count = await super().get_all(
+            limit=limit,
+            offset=offset,
+            joins=[(Memberships, User.id == Memberships.user_id)],
+            extra_filters=[Memberships.company_id == company_id],
+            extra_columns=[Memberships.role],
         )
-
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return [], 0
-
-        total_count = rows[0][2]
-        items = [[row[0], row[1]] for row in rows]
 
         return items, total_count
 
@@ -65,29 +56,16 @@ class UserRepository(BaseRepository[User]):
 
         return items, total_count
 
-    async def get_all_admins(
-        self, company_id: int, limit: int | None = None, offset: int | None = None
-    ):
-        query = (
-            select(User, Memberships.role, func.count().over().label("total_count"))
-            .join(
-                Memberships,
-                and_(
-                    User.id == Memberships.user_id, Memberships.role == RoleEnum.ADMIN
-                ),
-            )
-            .filter(Memberships.company_id == company_id)
-            .limit(limit or 5)
-            .offset(offset or 0)
+    async def get_all_admins(self, company_id: int, limit=None, offset=None):
+        items, total = await super().get_all(
+            limit=limit,
+            offset=offset,
+            joins=[(Memberships, User.id == Memberships.user_id)],
+            extra_filters=[
+                Memberships.company_id == company_id,
+                Memberships.role == RoleEnum.ADMIN,
+            ],
+            extra_columns=[Memberships.role],
         )
 
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return [], 0
-
-        total_count = rows[0][2]
-        items = [[row[0], row[1]] for row in rows]
-
-        return items, total_count
+        return items, total

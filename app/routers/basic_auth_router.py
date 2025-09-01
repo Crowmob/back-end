@@ -2,7 +2,12 @@ from fastapi import APIRouter, Depends, Header
 from typing import Annotated
 
 from app.schemas.response_models import MeResponseModel, AuthResponseModel
-from app.schemas.user import SignUpRequestModel, SignInRequestModel
+from app.schemas.user import (
+    SignUpRequestModel,
+    SignInRequestModel,
+    UserSchema,
+    UserDetailResponse,
+)
 from app.services.auth_services.basic import get_basic_auth_service, BasicAuthServices
 from app.utils.token import token_services
 
@@ -27,7 +32,8 @@ async def login(
 
 @basic_auth_router.get("/me", response_model=MeResponseModel)
 async def get_me(
-    email: Annotated[str | None, Depends(token_services.get_data_from_token)],
-    basic_auth_service: BasicAuthServices = Depends(get_basic_auth_service),
+    current_user: Annotated[
+        UserDetailResponse | None, Depends(token_services.get_data_from_token)
+    ] = None,
 ):
-    return await basic_auth_service.get_me(email)
+    return MeResponseModel(status_code=200, me=current_user)

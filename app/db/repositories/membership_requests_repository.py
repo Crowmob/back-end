@@ -55,27 +55,13 @@ class MembershipRequestsRepository(BaseRepository[MembershipRequests]):
         limit: int | None = None,
         offset: int | None = None,
     ):
-        query = (
-            select(MembershipRequests, func.count().over().label("total_count"))
-            .join(
-                Company,
-                and_(
-                    MembershipRequests.company_id == Company.id,
-                    Company.id == company_id,
-                ),
-            )
-            .where(MembershipRequests.type == request_type)
-            .offset(offset or 0)
-            .limit(limit or 5)
+        items, total_count = await super().get_all(
+            limit=limit,
+            offset=offset,
+            joins=[(Company, MembershipRequests.company_id == Company.id)],
+            extra_filters=[
+                MembershipRequests.type == request_type,
+                Company.id == company_id,
+            ],
         )
-
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return [], 0
-
-        total_count = rows[0][1]
-        items = [row[0] for row in rows]
-
         return items, total_count

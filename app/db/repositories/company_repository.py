@@ -11,48 +11,25 @@ class CompanyRepository(BaseRepository[Company]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, Company)
 
-    async def get_all_companies_for_owner(
-        self,
-        limit: int | None = 5,
-        offset: int | None = 0,
-        current_user: int | None = None,
-    ):
-        query = select(Company, func.count().over().label("total_count"))
-        query = (
-            query.where((Company.private == False) | (Company.owner == current_user))
-            .offset(offset or 0)
-            .limit(limit or 5)
+    async def get_all_companies_for_owner(self, limit=5, offset=0, current_user=None):
+        items, total = await super().get_all(
+            limit=limit,
+            offset=offset,
+            extra_filters=[
+                or_(Company.private == False, Company.owner == current_user)
+            ],
         )
+        return items, total
 
-        result = await self.session.execute(query)
-        rows = result.all()
-        if not rows:
-            return [], 0
-
-        total_count = rows[0].total_count
-        items = [row[0] for row in rows]
-        return items, total_count
-
-    async def get_companies_for_user(
-        self, user_id: int, limit: int | None = None, offset: int | None = None
-    ):
-        query = (
-            select(Company, Memberships.role, func.count().over().label("total_count"))
-            .join(Memberships, Company.id == Memberships.company_id)
-            .filter(Memberships.user_id == user_id)
-            .limit(limit or 5)
-            .offset(offset or 0)
+    async def get_companies_for_user(self, user_id, limit=None, offset=None):
+        items, total = await super().get_all(
+            limit=limit,
+            offset=offset,
+            joins=[(Memberships, Company.id == Memberships.company_id)],
+            extra_filters=[Memberships.user_id == user_id],
+            extra_columns=[Memberships.role],
         )
-
-        result = await self.session.execute(query)
-        rows = result.all()
-
-        if not rows:
-            return [], 0
-
-        total_count = rows[0][2]
-        items = [[row[0], row[1]] for row in rows]
-        return items, total_count
+        return items, total
 
     async def get_companies_by_ids(self, ids: list[int]):
         items, total_count = await super().get_all(

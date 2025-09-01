@@ -5,7 +5,7 @@ import aiofiles
 
 from fastapi import UploadFile
 
-from app.core.exceptions.exceptions import NotFoundException
+from app.core.exceptions.exceptions import NotFoundException, ConflictException
 from app.schemas.response_models import ResponseModel
 from app.services.user import get_user_service, UserServices
 from app.utils.settings_model import settings
@@ -22,7 +22,11 @@ class Auth0UserServices:
             ext = avatar.filename.split(".")[-1]
         else:
             ext = None
-        user_id = await self.user_service.create_user(name, email, None, ext)
+        try:
+            user_id = await self.user_service.create_user(name, email, None, ext)
+        except ConflictException:
+            user = await self.user_service.get_user_by_email(email)
+            user_id = user.id
         if ext:
             filename = f"{user_id}.{ext}"
             filepath = os.path.join("static/avatars/", filename)

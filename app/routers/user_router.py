@@ -8,6 +8,7 @@ from app.schemas.user import (
     GetAllUsersRequestModel,
     SignUpRequestModel,
     UserDetailResponse,
+    UserSchema,
 )
 from app.schemas.response_models import ResponseModel, ListResponse
 
@@ -17,17 +18,12 @@ user_router = APIRouter(tags=["User CRUD"], prefix="/users")
 @user_router.get("/{user_id}", response_model=UserDetailResponse)
 async def get_user_by_id_endpoint(
     user_id: int,
-    email: Annotated[str | None, Depends(token_services.get_data_from_token)],
+    current_user: Annotated[
+        UserDetailResponse | None, Depends(token_services.get_data_from_token)
+    ],
     user_service: UserServices = Depends(get_user_service),
 ):
-    return await user_service.get_user_by_id(user_id, email)
-
-
-@user_router.get("/{email}", response_model=UserDetailResponse)
-async def get_user_by_email_endpoint(
-    email: str, user_service: UserServices = Depends(get_user_service)
-):
-    return await user_service.get_user_by_email(email)
+    return await user_service.get_user_by_id(user_id, current_user.email)
 
 
 @user_router.get("/", response_model=ListResponse[UserDetailResponse])
@@ -57,8 +53,13 @@ async def update_user_endpoint(
     about: str = Form(...),
     avatar: UploadFile = File(None),
     user_service: UserServices = Depends(get_user_service),
+    current_user: Annotated[
+        UserDetailResponse | None, Depends(token_services.get_data_from_token)
+    ] = None,
 ):
-    await user_service.update_user(user_id, username, about=about, avatar=avatar)
+    await user_service.update_user(
+        user_id, username, about=about, avatar=avatar, current_user=current_user
+    )
     return ResponseModel(
         status_code=200, message=f"Successfully updated user with id: {user_id}!"
     )
@@ -66,9 +67,13 @@ async def update_user_endpoint(
 
 @user_router.delete("/{user_id}", response_model=ResponseModel)
 async def delete_user_endpoint(
-    user_id: int, user_service: UserServices = Depends(get_user_service)
+    user_id: int,
+    user_service: UserServices = Depends(get_user_service),
+    current_user: Annotated[
+        UserDetailResponse | None, Depends(token_services.get_data_from_token)
+    ] = None,
 ):
-    await user_service.delete_user(user_id)
+    await user_service.delete_user(user_id, current_user)
     return ResponseModel(
         status_code=200, message=f"Successfully deleted user with id: {user_id}!"
     )
