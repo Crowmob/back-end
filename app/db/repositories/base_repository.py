@@ -34,11 +34,21 @@ class BaseRepository(Generic[ModelType]):
             raise AppException(detail="Database exception occurred.")
 
     async def create_many(self, data: list[dict]):
-        if not data:
-            return []
-        stmt = insert(self.model).values(data).returning(self.model.id)
-        result = await self.session.execute(stmt)
-        return [row[0] for row in result.fetchall()]
+        try:
+            if not data:
+                return []
+            stmt = insert(self.model).values(data).returning(self.model.id)
+            result = await self.session.execute(stmt)
+            return [row[0] for row in result.fetchall()]
+        except IntegrityError as e:
+            logger.error(f"IntegrityError: {e}")
+            raise BadRequestException(detail="Failed to update. Wrong data")
+        except DataError as e:
+            logger.error(f"Data error: {e}")
+            raise BadRequestException(detail="Invalid format or length of fields")
+        except SQLAlchemyError as e:
+            logger.error(f"SQLAlchemyError: {e}")
+            raise AppException(detail="Database exception occurred.")
 
     async def get_by_id(self, obj_id: int):
         try:
@@ -60,45 +70,51 @@ class BaseRepository(Generic[ModelType]):
         outer_joins: list[tuple] = None,
         extra_columns: list = None,
     ):
-        query = select(
-            self.model, *(extra_columns or []), func.count().over().label("total_count")
-        )
+        try:
+            query = select(
+                self.model,
+                *(extra_columns or []),
+                func.count().over().label("total_count"),
+            )
 
-        if joins:
-            for join_args in joins:
-                query = query.join(*join_args)
+            if joins:
+                for join_args in joins:
+                    query = query.join(*join_args)
 
-        if outer_joins:
-            for join_args in outer_joins:
-                query = query.outerjoin(*join_args)
+            if outer_joins:
+                for join_args in outer_joins:
+                    query = query.outerjoin(*join_args)
 
-        if filters:
-            for field, value in filters.items():
-                column = getattr(self.model, field)
-                if isinstance(value, list):
-                    query = query.where(column.in_(value))
-                else:
-                    query = query.where(column == value)
+            if filters:
+                for field, value in filters.items():
+                    column = getattr(self.model, field)
+                    if isinstance(value, list):
+                        query = query.where(column.in_(value))
+                    else:
+                        query = query.where(column == value)
 
-        if extra_filters:
-            for condition in extra_filters:
-                query = query.where(condition)
+            if extra_filters:
+                for condition in extra_filters:
+                    query = query.where(condition)
 
-        query = query.offset(offset or 0).limit(limit or 10)
+            query = query.offset(offset or 0).limit(limit or 10)
 
-        result = await self.session.execute(query)
-        rows = result.all()
+            result = await self.session.execute(query)
+            rows = result.all()
 
-        if not rows:
-            return [], 0
+            if not rows:
+                return [], 0
 
-        if extra_columns:
-            items = [tuple(row[:-1]) for row in rows]
-        else:
-            items = [row[0] for row in rows]
+            if extra_columns:
+                items = [tuple(row[:-1]) for row in rows]
+            else:
+                items = [row[0] for row in rows]
 
-        total_count = rows[0][-1]
-        return items, total_count
+            total_count = rows[0][-1]
+            return items, total_count
+        except SQLAlchemyError as e:
+            logger.error(f"SQLAlchemyError in get_all: {e}")
+            raise AppException("Database exception occurred.")
 
     async def update(self, obj_id: int, data: dict):
         try:

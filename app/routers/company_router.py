@@ -33,12 +33,14 @@ async def get_all_companies(
 @company_router.get("/{company_id}", response_model=CompanyDetailResponse)
 async def get_company_by_id(
     company_id: int,
-    _: Annotated[
+    current_user: Annotated[
         UserDetailResponse | None, Depends(token_services.get_data_from_token)
     ] = None,
     company_service: CompanyServices = Depends(get_company_service),
 ):
-    return await company_service.get_company_by_id(company_id)
+    return await company_service.get_company_by_id(
+        company_id, current_user.id, current_user.email
+    )
 
 
 @company_router.post("/", response_model=CompanyIdResponse)
@@ -59,7 +61,7 @@ async def create_company(
 async def update_company(
     company_id: int,
     data: CompanyUpdateRequestModel = Body(),
-    _: Annotated[
+    current_user: Annotated[
         UserDetailResponse | None, Depends(token_services.get_data_from_token)
     ] = None,
     company_service: CompanyServices = Depends(get_company_service),
@@ -69,6 +71,8 @@ async def update_company(
         data.name,
         data.description,
         data.private,
+        current_user.id,
+        current_user.email,
     )
     return ResponseModel(status_code=200, message="Company updated successfully")
 
@@ -81,5 +85,7 @@ async def delete_company(
     ] = None,
     company_service: CompanyServices = Depends(get_company_service),
 ):
-    await company_service.delete_company(company_id, current_user.email)
+    await company_service.delete_company(
+        company_id, current_user.id, current_user.email
+    )
     return ResponseModel(status_code=200, message="Company deleted successfully")

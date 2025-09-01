@@ -106,22 +106,26 @@ class QuizRepository(BaseRepository[Quiz]):
             raise AppException(detail="Database exception occurred.")
 
     async def get_full_quiz_data_for_user(self, selected_answer_ids: list[int]):
-        query = (
-            select(
-                Answer.text.label("answer_text"),
-                Answer.is_correct,
-                Question.text.label("question_text"),
-                Quiz.title.label("quiz_title"),
-                Quiz.description.label("quiz_description"),
+        try:
+            query = (
+                select(
+                    Answer.text.label("answer_text"),
+                    Answer.is_correct,
+                    Question.text.label("question_text"),
+                    Quiz.title.label("quiz_title"),
+                    Quiz.description.label("quiz_description"),
+                )
+                .select_from(SelectedAnswers)
+                .join(Answer, SelectedAnswers.answer_id == Answer.id)
+                .join(Question, Answer.question_id == Question.id)
+                .join(Quiz, Question.quiz_id == Quiz.id)
+                .filter(SelectedAnswers.id.in_(selected_answer_ids))
             )
-            .select_from(SelectedAnswers)
-            .join(Answer, SelectedAnswers.answer_id == Answer.id)
-            .join(Question, Answer.question_id == Question.id)
-            .join(Quiz, Question.quiz_id == Quiz.id)
-            .filter(SelectedAnswers.id.in_(selected_answer_ids))
-        )
 
-        result = await self.session.execute(query)
-        rows = result.fetchall()
+            result = await self.session.execute(query)
+            rows = result.fetchall()
 
-        return rows
+            return rows
+        except SQLAlchemyError as e:
+            logger.error(f"SQLAlchemyError: {e}")
+            raise AppException(detail="Database exception occurred.")

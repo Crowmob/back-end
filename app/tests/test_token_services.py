@@ -21,14 +21,14 @@ def test_create_and_decode_token():
 
 @pytest.mark.asyncio
 @patch("app.utils.token.TokenServices.decode_auth0_token")
-async def test_get_data_from_token(mock_decode):
-    mock_decode.return_value = {"id": 1, "email": "test@mail.com"}
+async def test_get_data_from_token(mock_decode, user_services_fixture, test_user):
+    mock_decode.return_value = {"id": test_user["id"], "email": test_user["email"]}
 
     token = token_services.create_access_token(1)
     credentials = f"Bearer {token}"
 
-    data = await token_services.get_data_from_token(credentials)
-    assert data == "test@mail.com"
+    data = await token_services.get_data_from_token(credentials, user_services_fixture)
+    assert data.email == "test@example.com"
 
 
 @pytest.mark.asyncio

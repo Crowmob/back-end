@@ -54,7 +54,9 @@ async def test_get_all_companies(db_session, company_services_fixture, test_user
 @pytest.mark.asyncio
 async def test_get_company_by_id(company_services_fixture, test_membership):
     company = await company_services_fixture.get_company_by_id(
-        test_membership["company_id"], test_membership["user_email"]
+        test_membership["company_id"],
+        test_membership["user_id"],
+        test_membership["user_email"],
     )
 
     assert company.name == "test"
@@ -69,6 +71,7 @@ async def test_update_company(db_session, company_services_fixture, test_members
         data.name,
         data.description,
         data.private,
+        test_membership["user_id"],
         test_membership["user_email"],
     )
 
@@ -81,7 +84,9 @@ async def test_update_company(db_session, company_services_fixture, test_members
 @pytest.mark.asyncio
 async def test_delete_company(db_session, company_services_fixture, test_membership):
     await company_services_fixture.delete_company(
-        test_membership["company_id"], test_membership["user_email"]
+        test_membership["company_id"],
+        test_membership["user_id"],
+        test_membership["user_email"],
     )
 
     user = await db_session.scalar(

@@ -108,11 +108,11 @@ class QuizServices:
         company_id: int,
         limit: int | None = None,
         offset: int | None = None,
-        current_user: UserDetailResponse = None,
+        current_user_id: int = None,
     ):
         async with UnitOfWork() as uow:
             items, total_count = await uow.quizzes.get_all_quizzes(
-                company_id, current_user.id, limit, offset
+                company_id, current_user_id, limit, offset
             )
             logger.info(items)
             items = [
@@ -152,9 +152,9 @@ class QuizServices:
             logger.info(f"Deleted quiz id: {quiz_id}")
 
     @staticmethod
-    async def quiz_submit(data: QuizSubmitRequest, current_user: UserDetailResponse):
+    async def quiz_submit(data: QuizSubmitRequest, current_user_id: int):
         async with UnitOfWork() as uow:
-            if current_user.id != data.user_id:
+            if current_user_id != data.user_id:
                 raise ForbiddenException(
                     detail="You cannot submit a quiz for another user"
                 )
@@ -187,9 +187,7 @@ class QuizServices:
                 for question in data.questions
                 for answer in question.answers
             ]
-            answer_ids = await uow.answers.create_selected_answers(
-                record_id, selected_answers
-            )
+            answer_ids = await uow.answers.create_selected_answers(selected_answers)
             quiz_redis_repo = QuizRedisRepository(get_redis_client())
             answers_data = [
                 {
@@ -225,10 +223,10 @@ class QuizServices:
         user_id: int = None,
         quiz_id: int = None,
         company_id: int = None,
-        current_user: UserDetailResponse = None,
+        current_user_id: int = None,
     ):
         async with UnitOfWork() as uow:
-            user_id = user_id if user_id is not None else current_user.id
+            user_id = user_id if user_id is not None else current_user_id
             quiz_redis_repo = QuizRedisRepository(get_redis_client())
             answers = await quiz_redis_repo.get_answers_for_user(
                 user_id, quiz_id, company_id

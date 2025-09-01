@@ -105,11 +105,11 @@ class UserServices:
         password: str | None = None,
         about: str | None = None,
         avatar: UploadFile | None = None,
-        current_user: UserDetailResponse | None = None,
+        current_user_id: int = None,
     ):
         async with UnitOfWork() as uow:
             user = await self.get_user_by_id_with_uow(user_id, uow)
-            if user.id != current_user.id:
+            if user.id != current_user_id:
                 raise ForbiddenException(detail=f"You cannot update another user")
             if avatar:
                 ext = avatar.filename.split(".")[-1]
@@ -141,10 +141,10 @@ class UserServices:
             )
             logger.info(f"User updated: id={user_id}")
 
-    async def delete_user(self, user_id: int, current_user: UserDetailResponse):
+    async def delete_user(self, user_id: int, current_user_id: int):
         async with UnitOfWork() as uow:
             user = await self.get_user_by_id_with_uow(user_id, uow)
-            if user.id != current_user.id:
+            if user.id != current_user_id:
                 raise ForbiddenException(detail=f"You cannot delete another user")
             await uow.users.delete_user(user_id)
             logger.info(f"User deleted: id={user_id}")

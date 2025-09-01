@@ -81,22 +81,26 @@ class CompanyServices:
 
     @staticmethod
     async def get_company_by_id_with_uow(
-        company_id: int, uow: UnitOfWork, current_user: UserDetailResponse
+        company_id: int, uow: UnitOfWork, current_user_id: int, current_user_email: str
     ):
-        result = await uow.companies.get_company_by_id(company_id, current_user.id)
+        result = await uow.companies.get_company_by_id(company_id, current_user_id)
         if not result:
             logger.warning(f"No company found with id={company_id}")
             raise NotFoundException(detail=f"No company found with id={company_id}")
         company = CompanyDetailResponse.model_validate(result)
         logger.info(f"Fetched company with id={company_id}")
         owner = await uow.users.get_by_id(company.owner)
-        if current_user.email == owner.email:
+        if current_user_email == owner.email:
             company.is_owner = True
         return company
 
-    async def get_company_by_id(self, company_id: int):
+    async def get_company_by_id(
+        self, company_id: int, current_user_id: int, current_user_email: str
+    ):
         async with UnitOfWork() as uow:
-            return await self.get_company_by_id_with_uow(company_id, uow)
+            return await self.get_company_by_id_with_uow(
+                company_id, uow, current_user_id, current_user_email
+            )
 
     async def update_company(
         self,
@@ -104,9 +108,13 @@ class CompanyServices:
         name: str | None = None,
         description: str | None = None,
         private: bool | None = True,
+        current_user_id: int = None,
+        current_user_email: str = None,
     ):
         async with UnitOfWork() as uow:
-            await self.get_company_by_id_with_uow(company_id, uow)
+            await self.get_company_by_id_with_uow(
+                company_id, uow, current_user_id, current_user_email
+            )
             update_model = CompanyUpdateRequestModel(
                 name=name, description=description, private=private
             )
@@ -119,11 +127,13 @@ class CompanyServices:
                 status_code=200, message="Company updated successfully"
             )
 
-    async def delete_company(self, company_id: int, email: str | None):
+    async def delete_company(
+        self, company_id: int, current_user_id: int, current_user_email: str
+    ):
         async with UnitOfWork() as uow:
-            if not email:
-                raise UnauthorizedException(detail="Unauthorized")
-            await self.get_company_by_id_with_uow(company_id, uow, email)
+            await self.get_company_by_id_with_uow(
+                company_id, uow, current_user_id, current_user_email
+            )
             await uow.companies.delete(company_id)
             logger.info(f"Company deleted: id={company_id}")
 

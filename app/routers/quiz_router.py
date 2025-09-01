@@ -28,7 +28,7 @@ async def get_all_quizzes(
     quiz_service: QuizServices = Depends(get_quiz_service),
 ):
     return await quiz_service.get_all_quizzes(
-        data.company_id, data.limit, data.offset, current_user
+        data.company_id, data.limit, data.offset, current_user.id
     )
 
 
@@ -68,7 +68,7 @@ async def quiz_submit(
         UserDetailResponse | None, Depends(token_services.get_data_from_token)
     ] = None,
 ):
-    await quiz_service.quiz_submit(data, current_user)
+    await quiz_service.quiz_submit(data, current_user.id)
     return ResponseModel(status_code=200, message="Submitted quiz")
 
 
@@ -93,7 +93,9 @@ async def export_all_quizzes_data_for_user(
     quiz_service: QuizServices = Depends(get_quiz_service),
     export_service: ExportService = Depends(get_export_service),
 ):
-    quiz_data = await quiz_service.get_quiz_data_for_user(current_user=current_user)
+    quiz_data = await quiz_service.get_quiz_data_for_user(
+        current_user_id=current_user.id
+    )
     return export_service.export_data(
         quiz_data, export_format, f"quizzes_user_{current_user.email}"
     )
@@ -111,7 +113,7 @@ async def export_all_quizzes_data_for_user_in_company(
     export_service: ExportService = Depends(get_export_service),
 ):
     quiz_data = await quiz_service.get_quiz_data_for_user(
-        user_id=user_id, company_id=company_id, current_user=current_user
+        user_id=user_id, company_id=company_id, current_user_id=current_user.id
     )
     return export_service.export_data(
         quiz_data, export_format, f"quizzes_user_{current_user.email}"
@@ -134,7 +136,7 @@ async def export_single_quiz_data_for_user_in_company(
         user_id=user_id,
         quiz_id=quiz_id,
         company_id=company_id,
-        current_user=current_user,
+        current_user_id=current_user.id,
     )
     return export_service.export_data(
         quiz_data, export_format, f"quiz_{quiz_id}_user_{current_user.email}"
