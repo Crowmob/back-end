@@ -1,15 +1,23 @@
 import logging
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DataError
 
 from app.db.unit_of_work import UnitOfWork
-from app.core.exceptions.company_exceptions import (
-    CompanyWithIdNotFoundException,
-    CompanyUpdateException,
+from app.core.exceptions.exceptions import (
+    NotFoundException,
+    BadRequestException,
     AppException,
+    UnauthorizedException,
+    ConflictException,
 )
 from app.models.membership_model import RoleEnum
-from app.schemas.company import CompanyUpdateRequestModel, CompanySchema
+from app.schemas.company import (
+    CompanyUpdateRequestModel,
+    CompanySchema,
+    CompanyDetailResponse,
+)
 from app.schemas.membership import MembershipSchema
+from app.schemas.response_models import ListResponse, ResponseModel
+from app.schemas.user import UserDetailResponse
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +35,6 @@ class CompanyServices:
                 owner=owner, name=name, description=description, private=private
             )
             company_id = await uow.companies.create(company.model_dump())
-            logger.info(RoleEnum.OWNER.value)
             membership = MembershipSchema(
                 user_id=owner, company_id=company_id, role=RoleEnum.OWNER.value
             )
@@ -39,39 +46,60 @@ class CompanyServices:
     async def get_all_companies(
         limit: int | None = None,
         offset: int | None = None,
-        current_user: int | None = None,
+        email: str | None = None,
     ):
         async with UnitOfWork() as uow:
-            try:
-                companies = await uow.companies.get_all_companies(
-                    limit, offset, current_user
+            if email:
+                user = await uow.users.get_user_by_email(email)
+            else:
+                user = None
+            if user:
+                items, total_count = await uow.companies.get_companies_for_user(
+                    limit, offset, user.id
                 )
-                logger.info("Fetched companies")
-                logger.info(companies)
-                return companies
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise
+            else:
+                items, total_count = await uow.companies.get_all(
+                    filters={"private": False}, limit=limit, offset=offset
+                )
+            companies = ListResponse[CompanyDetailResponse](
+                items=[
+                    CompanyDetailResponse(
+                        id=company.id,
+                        owner=company.owner,
+                        name=company.name,
+                        description=company.description,
+                        private=company.private,
+                    )
+                    for company in items
+                ],
+                count=total_count,
+            )
+            logger.info("Fetched companies")
+            logger.info(companies)
+            return companies
 
     @staticmethod
     async def get_company_by_id_with_uow(
-        company_id: int, uow: UnitOfWork, current_user: int
+        company_id: int, uow: UnitOfWork, current_user_id: int, current_user_email: str
     ):
-        try:
-            company = await uow.companies.get_company_by_id(company_id, current_user)
-            if not company:
-                logger.warning(f"No company found with id={company_id}")
-                raise CompanyWithIdNotFoundException(company_id)
-            logger.info(f"Fetched company with id={company_id}")
-            return company
+        result = await uow.companies.get_company_by_id(company_id, current_user_id)
+        if not result:
+            logger.warning(f"No company found with id={company_id}")
+            raise NotFoundException(detail=f"No company found with id={company_id}")
+        company = CompanyDetailResponse.model_validate(result)
+        logger.info(f"Fetched company with id={company_id}")
+        owner = await uow.users.get_by_id(company.owner)
+        if current_user_email == owner.email:
+            company.is_owner = True
+        return company
 
-        except SQLAlchemyError as e:
-            logger.info(f"SQLAlchemy error: {e}")
-            raise
-
-    async def get_company_by_id(self, company_id: int, current_user: int):
+    async def get_company_by_id(
+        self, company_id: int, current_user_id: int, current_user_email: str
+    ):
         async with UnitOfWork() as uow:
-            return await self.get_company_by_id_with_uow(company_id, uow, current_user)
+            return await self.get_company_by_id_with_uow(
+                company_id, uow, current_user_id, current_user_email
+            )
 
     async def update_company(
         self,
@@ -79,39 +107,35 @@ class CompanyServices:
         name: str | None = None,
         description: str | None = None,
         private: bool | None = True,
-        current_user: int | None = None,
+        current_user_id: int = None,
+        current_user_email: str = None,
     ):
         async with UnitOfWork() as uow:
-            await self.get_company_by_id_with_uow(company_id, uow, current_user)
-            try:
-                update_model = CompanyUpdateRequestModel(
-                    name=name, description=description, private=private
-                )
-                await uow.companies.update(
-                    company_id,
-                    update_model.model_dump(),
-                )
+            await self.get_company_by_id_with_uow(
+                company_id, uow, current_user_id, current_user_email
+            )
+            update_model = CompanyUpdateRequestModel(
+                name=name, description=description, private=private
+            )
+            await uow.companies.update(
+                company_id,
+                update_model.model_dump(),
+            )
+            logger.info(f"Company updated: id={company_id}")
+            return ResponseModel(
+                status_code=200, message="Company updated successfully"
+            )
 
-                logger.info(f"Company updated: id={company_id}")
-
-            except IntegrityError as e:
-                logger.error(f"Integrity error: {e}")
-                raise CompanyUpdateException(company_id)
-
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise AppException(detail="Database exception occurred.")
-
-    async def delete_company(self, company_id: int, current_user: int):
+    async def delete_company(
+        self, company_id: int, current_user_id: int, current_user_email: str
+    ):
         async with UnitOfWork() as uow:
-            await self.get_company_by_id_with_uow(company_id, uow, current_user)
-            try:
-                await uow.companies.delete(company_id)
-                logger.info(f"Company deleted: id={company_id}")
-
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise
+            await self.get_company_by_id_with_uow(
+                company_id, uow, current_user_id, current_user_email
+            )
+            await uow.companies.delete(company_id)
+            logger.info(f"Company deleted: id={company_id}")
 
 
-company_services = CompanyServices()
+def get_company_service() -> CompanyServices:
+    return CompanyServices()

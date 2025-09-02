@@ -2,13 +2,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from app.core.exceptions.quiz_exceptions import QuizException
-from app.schemas.base import TimestampMixin, IDMixin
+from app.core.exceptions.exceptions import BadRequestException
+from app.schemas.base import IDMixin
 
 
 class QuizSchema(BaseModel):
     title: str
     description: str
+    frequency: int
 
 
 class QuestionSchema(BaseModel):
@@ -26,29 +27,25 @@ class QuizParticipantSchema(BaseModel):
     completed_at: datetime
 
 
-class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-
-class QuestionWithAnswersSchema(IDMixin, QuestionSchema, BaseModel):
-    answers: list[AnswerDetailResponse]
+class QuestionWithAnswersSchema(QuestionSchema, BaseModel):
+    answers: list[AnswerSchema]
 
     @model_validator(mode="after")
     def validate_answers(self) -> "QuestionWithAnswersSchema":
         if not (2 <= len(self.answers) <= 4):
-            raise QuizException(
+            raise BadRequestException(
                 detail="Number of answers in question must be more than 1 and less than 5"
             )
         return self
 
 
-class QuizWithQuestionsSchema(IDMixin, QuizSchema, BaseModel):
+class QuizWithQuestionsSchema(QuizSchema, BaseModel):
     questions: list[QuestionWithAnswersSchema]
 
     @model_validator(mode="after")
     def validate_questions(self) -> "QuizWithQuestionsSchema":
         if len(self.questions) < 2:
-            raise QuizException(detail="Quiz should have at least 2 questions")
+            raise BadRequestException(detail="Quiz should have at least 2 questions")
         return self
 
 
@@ -57,11 +54,23 @@ class QuestionDetailResponse(IDMixin, QuestionSchema, BaseModel):
 
 
 class QuizDetailResponse(IDMixin, QuizSchema, BaseModel):
-    pass
+    is_available: bool
+
+
+class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class QuestionWithAnswersDetailResponse(IDMixin, QuestionSchema, BaseModel):
+    answers: list[AnswerDetailResponse]
+
+
+class QuizWithQuestionsDetailResponse(IDMixin, QuizSchema, BaseModel):
+    questions: list[QuestionWithAnswersDetailResponse]
 
 
 class QuizParticipantDetailResponse(IDMixin, QuizParticipantSchema, BaseModel):
-    pass
+    model_config = {"from_attributes": True}
 
 
 class QuizCreateSchema(QuizSchema, BaseModel):

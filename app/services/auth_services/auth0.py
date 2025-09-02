@@ -5,35 +5,38 @@ import aiofiles
 
 from fastapi import UploadFile
 
-from app.core.exceptions.user_exceptions import UserWithEmailNotFoundException
-from app.services.user import user_services
+from app.core.exceptions.exceptions import NotFoundException, ConflictException
+from app.schemas.response_models import ResponseModel
+from app.services.user import get_user_service, UserServices
 from app.utils.settings_model import settings
-from app.utils.token import token_services
 
 logger = logging.getLogger(__name__)
 
 
 class Auth0UserServices:
-    @staticmethod
-    async def auth_user(name: str, avatar: UploadFile | None, email: str, sub: str):
-        sub = sub.split("|")
-        auth_provider = sub[0]
-        oauth_id = sub[1]
+    def __init__(self, user_service: UserServices):
+        self.user_service = user_service
+
+    async def auth_user(self, name: str, avatar: UploadFile | None, email: str):
         if avatar:
             ext = avatar.filename.split(".")[-1]
         else:
             ext = None
-        user_id = await user_services.create_user(
-            name, email, None, auth_provider, oauth_id, ext
-        )
-        filepath = None
+        try:
+            user_id = await self.user_service.create_user(name, email, None, ext)
+        except ConflictException:
+            user = await self.user_service.get_user_by_email(email)
+            user_id = user.id
         if ext:
             filename = f"{user_id}.{ext}"
             filepath = os.path.join("static/avatars/", filename)
             async with aiofiles.open(filepath, "wb") as out_file:
                 while content := await avatar.read(1024):
                     await out_file.write(content)
-        return user_id, filepath if ext else None
+        return ResponseModel(
+            status_code=200,
+            message=f"Successfully authenticated user with email: {user_id}",
+        )
 
     @staticmethod
     async def login_user(email: str, password: str):
@@ -55,10 +58,10 @@ class Auth0UserServices:
 
     async def register_user(self, username: str, email: str, password: str):
         try:
-            user = await user_services.get_user_by_email(email)
+            user = await self.user_service.get_user_by_email(email)
             if user:
                 return {"message": "invalid_signup"}
-        except UserWithEmailNotFoundException:
+        except NotFoundException:
             pass
         url = f"https://{settings.auth.AUTH0_DOMAIN}/dbconnections/signup"
         payload = {
@@ -77,11 +80,10 @@ class Auth0UserServices:
             return response
         else:
             response = await self.login_user(email, password)
-            data = await token_services.get_data_from_token(response["access_token"])
-            sub = data["sub"].split("|")
-            await user_services.create_user(username, email, password, sub[0], sub[1])
+            await self.user_service.create_user(username, email, password)
         logger.info(response)
         return response
 
 
-auth0_user_services = Auth0UserServices()
+def get_auth0_service() -> Auth0UserServices:
+    return Auth0UserServices(get_user_service())

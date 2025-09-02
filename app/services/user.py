@@ -3,16 +3,19 @@ import os
 import glob
 import aiofiles
 
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError, DataError
 from fastapi import UploadFile
 
 from app.db.unit_of_work import UnitOfWork
+from app.schemas.response_models import ListResponse
 from app.utils.password import password_services
-from app.core.exceptions.user_exceptions import (
+from app.core.exceptions.exceptions import (
     AppException,
-    UserWithIdNotFoundException,
-    UserWithEmailNotFoundException,
-    UserUpdateException,
+    NotFoundException,
+    ConflictException,
+    BadRequestException,
+    UnauthorizedException,
+    ForbiddenException,
 )
 from app.utils.settings_model import settings
 from app.schemas.user import UserDetailResponse, UserUpdateRequestModel, UserSchema
@@ -26,87 +29,74 @@ class UserServices:
         username: str | None,
         email: str,
         password: str | None,
-        auth_provider: str | None,
-        oauth_id: str | None,
         avatar_ext: str | None = None,
     ):
         async with UnitOfWork() as uow:
             if password:
                 password = password_services.hash_password(password)
-            try:
-                user = UserSchema(
-                    username=username,
-                    email=email,
-                    password=password,
-                    avatar_ext=avatar_ext,
-                )
-                user_id = await uow.users.create(user.model_dump())
-                logger.info(f"User created: {username}")
-
-            except IntegrityError:
-                logger.warning(f"User with email {email} already exists.")
-                await uow.session.rollback()
-
-                user = await uow.users.get_user_by_email(email)
-                if not user:
-                    logger.error(f"User not found by email: {email}")
-                    raise UserWithEmailNotFoundException(email=email)
-
-                user_id = user.id
-
+            user = UserSchema(
+                username=username,
+                email=email,
+                password=password,
+                avatar_ext=avatar_ext,
+            )
+            user_id = await uow.users.create(user.model_dump())
+            logger.info(f"User created: {username}")
             return user_id
 
     @staticmethod
     async def get_all_users(limit: int | None = None, offset: int | None = None):
         async with UnitOfWork() as uow:
-            try:
-                users = await uow.users.get_all_users(limit, offset)
-                logger.info("Fetched users")
-                logger.info(users)
-                return users
-
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise
+            items, total_count = await uow.users.get_all_users(limit, offset)
+            return ListResponse[UserDetailResponse](
+                items=[
+                    UserDetailResponse(
+                        id=user.id,
+                        username=user.username,
+                        email=user.email,
+                        about=user.about,
+                        avatar=(
+                            f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+                            if user.avatar_ext
+                            else None
+                        ),
+                    )
+                    for user in items
+                ],
+                count=total_count,
+            )
 
     @staticmethod
     async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
-        try:
-            user = await uow.users.get_by_id(user_id)
-            if not user:
-                logger.warning(f"No user found with id={user_id}")
-                raise UserWithIdNotFoundException(user_id)
-            user_dict = user.__dict__.copy()
-            if user_dict["avatar_ext"]:
-                user_dict["avatar"] = (
-                    f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
-                )
-            user_dict.pop("avatar_ext")
-            logger.info(f"Fetched user with id={user_id}")
-            return UserDetailResponse.model_validate(user_dict)
+        user = await uow.users.get_by_id(user_id)
+        if not user:
+            logger.warning(f"No user found with id={user_id}")
+            raise NotFoundException(detail=f"No user found with id={user_id}")
+        user_dict = user.__dict__.copy()
+        if user_dict["avatar_ext"]:
+            user_dict["avatar"] = (
+                f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
+            )
+        user_dict.pop("avatar_ext")
+        logger.info(f"Fetched user with id={user_id}")
+        return UserDetailResponse.model_validate(user_dict)
 
-        except SQLAlchemyError as e:
-            logger.info(f"SQLAlchemy error: {e}")
-            raise
-
-    async def get_user_by_id(self, user_id: int):
+    async def get_user_by_id(self, user_id: int, email: str):
         async with UnitOfWork() as uow:
-            return await self.get_user_by_id_with_uow(user_id, uow)
+            user_data = await self.get_user_by_id_with_uow(user_id, uow)
+            if email == user_data.email:
+                user_data.current_user = True
+            return user_data
 
     @staticmethod
     async def get_user_by_email(email: str):
         async with UnitOfWork() as uow:
-            try:
-                user = await uow.users.get_user_by_email(email)
-                if not user:
-                    logger.warning(f"No user found with email={email}")
-                    raise UserWithEmailNotFoundException(email)
-                logger.info(f"Fetched user with email={email}")
-                return user
-
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise
+            user = await uow.users.get_user_by_email(email)
+            if not user:
+                logger.warning(f"No user found with email={email}")
+                raise NotFoundException(detail=f"No user found with email={email}")
+            logger.info(f"Fetched user with email={email}")
+            return UserDetailResponse.model_validate(user)
 
     async def update_user(
         self,
@@ -115,9 +105,12 @@ class UserServices:
         password: str | None = None,
         about: str | None = None,
         avatar: UploadFile | None = None,
+        current_user_id: int = None,
     ):
         async with UnitOfWork() as uow:
             user = await self.get_user_by_id_with_uow(user_id, uow)
+            if user.id != current_user_id:
+                raise ForbiddenException(detail=f"You cannot update another user")
             if avatar:
                 ext = avatar.filename.split(".")[-1]
                 filename = f"{user_id}.{ext}"
@@ -134,40 +127,28 @@ class UserServices:
                 ext = None
             if password:
                 password = password_services.hash_password(password)
-            try:
-                update_model = UserUpdateRequestModel(
-                    username=username,
-                    password=password,
-                    about=about,
-                    avatar_ext=ext
-                    if ext
-                    else (user.avatar.split(".")[-1] if user.avatar else None),
-                )
-                await uow.users.update(
-                    user_id,
-                    update_model.model_dump(),
-                )
+            update_model = UserUpdateRequestModel(
+                username=username,
+                password=password,
+                about=about,
+                avatar_ext=ext
+                if ext
+                else (user.avatar.split(".")[-1] if user.avatar else None),
+            )
+            await uow.users.update(
+                user_id,
+                update_model.model_dump(),
+            )
+            logger.info(f"User updated: id={user_id}")
 
-                logger.info(f"User updated: id={user_id}")
-
-            except IntegrityError as e:
-                logger.error(f"Integrity error: {e}")
-                raise UserUpdateException(user_id)
-
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise AppException(detail="Database exception occurred.")
-
-    async def delete_user(self, user_id: int):
+    async def delete_user(self, user_id: int, current_user_id: int):
         async with UnitOfWork() as uow:
-            await self.get_user_by_id_with_uow(user_id, uow)
-            try:
-                await uow.users.delete_user(user_id)
-                logger.info(f"User deleted: id={user_id}")
-
-            except SQLAlchemyError as e:
-                logger.error(f"SQLAlchemy error: {e}")
-                raise
+            user = await self.get_user_by_id_with_uow(user_id, uow)
+            if user.id != current_user_id:
+                raise ForbiddenException(detail=f"You cannot delete another user")
+            await uow.users.delete_user(user_id)
+            logger.info(f"User deleted: id={user_id}")
 
 
-user_services = UserServices()
+def get_user_service() -> UserServices:
+    return UserServices()

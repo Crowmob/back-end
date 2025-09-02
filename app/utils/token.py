@@ -2,11 +2,18 @@ import httpx
 import logging
 
 from datetime import datetime, timedelta
+
+from fastapi import Header, Depends
 from jose import JWTError, jwt
 from jose import jwk as jose_jwk
 from fastapi.security import HTTPBearer
 
-from app.core.exceptions.auth_exceptions import UnauthorizedException
+from app.core.exceptions.exceptions import (
+    UnauthorizedException,
+    ForbiddenException,
+    ConflictException,
+)
+from app.services.user import UserServices, get_user_service
 from app.utils.settings_model import settings
 
 AUTH0_DOMAIN = settings.auth.AUTH0_DOMAIN
@@ -62,13 +69,23 @@ class TokenServices:
             logger.error("Incorrect claims")
             raise UnauthorizedException(detail="Incorrect claims.")
 
-    async def get_data_from_token(self, token: str):
-        if token:
-            data = await self.decode_auth0_token(token)
-        else:
-            data = {"sub": "|"}
+    async def get_data_from_token(
+        self,
+        authorization: str = Header(...),
+        user_service: UserServices = Depends(get_user_service),
+    ):
+        token = authorization.removeprefix("Bearer ")
+        if not token:
+            raise UnauthorizedException(detail="Missing Bearer token")
+        data = await self.decode_auth0_token(token)
         logger.info(data)
-        return data
+        email = data.get("email")
+        if not email:
+            raise UnauthorizedException(detail="Invalid token: no email claim")
+        current_user = await user_service.get_user_by_email(data["email"])
+        if not current_user:
+            raise ConflictException("Authenticated user does not exist")
+        return current_user
 
     @staticmethod
     def create_access_token(id: int):

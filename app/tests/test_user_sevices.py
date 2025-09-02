@@ -11,7 +11,7 @@ async def test_create_user(db_session, user_services_fixture):
     user_data = UserSchema(username="test", email="test@example.com", password="1234")
 
     user_id = await user_services_fixture.create_user(
-        user_data.username, user_data.email, user_data.password, None, None
+        user_data.username, user_data.email, user_data.password
     )
     assert isinstance(user_id, int)
 
@@ -41,7 +41,9 @@ async def test_get_all_users(db_session, user_services_fixture):
 
 @pytest.mark.asyncio
 async def test_get_user_by_id(user_services_fixture, test_user):
-    user = await user_services_fixture.get_user_by_id(test_user["id"])
+    user = await user_services_fixture.get_user_by_id(
+        test_user["id"], test_user["email"]
+    )
 
     assert user.username == "test"
     assert user.email == "test@example.com"
@@ -59,7 +61,7 @@ async def test_get_user_by_email(user_services_fixture, test_user):
 async def test_update_user(db_session, user_services_fixture, test_user):
     data = UserUpdateRequestModel(username="updated")
     await user_services_fixture.update_user(
-        test_user["id"], data.username, data.password
+        test_user["id"], data.username, data.password, current_user_id=test_user["id"]
     )
 
     updated_user = await db_session.scalar(
@@ -70,7 +72,9 @@ async def test_update_user(db_session, user_services_fixture, test_user):
 
 @pytest.mark.asyncio
 async def test_delete_user(db_session, user_services_fixture, test_user):
-    await user_services_fixture.delete_user(test_user["id"])
+    await user_services_fixture.delete_user(
+        test_user["id"], current_user_id=test_user["id"]
+    )
 
     user = await db_session.scalar(select(User).where(User.id == test_user["id"]))
     assert user.has_profile is False

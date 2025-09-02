@@ -1,8 +1,14 @@
+import logging
+
 from sqlalchemy import select, func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions.exceptions import AppException
 from app.db.repositories.base_repository import BaseRepository
 from app.models.quiz_model import Records, Question, Quiz, QuizParticipant
+
+logger = logging.getLogger(__name__)
 
 
 class RecordsRepository(BaseRepository[Records]):
@@ -10,43 +16,51 @@ class RecordsRepository(BaseRepository[Records]):
         super().__init__(session, Records)
 
     async def get_average_score_in_company(self, user_id: int, company_id: int):
-        total_questions_query = (
-            select(func.count(Question.id))
-            .join(Quiz, Quiz.id == Question.quiz_id)
-            .where(Quiz.company_id == company_id)
-        ).scalar_subquery()
+        try:
+            total_questions_query = (
+                select(func.count(Question.id))
+                .join(Quiz, Quiz.id == Question.quiz_id)
+                .where(Quiz.company_id == company_id)
+            ).scalar_subquery()
 
-        user_correct_query = (
-            select(func.coalesce(func.sum(Records.score), 0))
-            .join(QuizParticipant, QuizParticipant.id == Records.participant_id)
-            .join(Quiz, Quiz.id == QuizParticipant.quiz_id)
-            .where(
-                QuizParticipant.user_id == user_id,
-                Quiz.company_id == company_id,
+            user_correct_query = (
+                select(func.coalesce(func.sum(Records.score), 0))
+                .join(QuizParticipant, QuizParticipant.id == Records.participant_id)
+                .join(Quiz, Quiz.id == QuizParticipant.quiz_id)
+                .where(
+                    QuizParticipant.user_id == user_id,
+                    Quiz.company_id == company_id,
+                )
+            ).scalar_subquery()
+
+            query = select(
+                (user_correct_query * 100 / func.nullif(total_questions_query, 0))
             )
-        ).scalar_subquery()
 
-        query = select(
-            (user_correct_query * 100 / func.nullif(total_questions_query, 0))
-        )
-
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none() or 0
+            result = await self.session.execute(query)
+            return result.scalar_one_or_none() or 0
+        except SQLAlchemyError as e:
+            logger.error(f"SQLAlchemyError: {e}")
+            raise AppException(detail="Database exception occurred.")
 
     async def get_average_score_in_system(self, user_id: int):
-        total_questions_query = select(func.count(Question.id)).scalar_subquery()
+        try:
+            total_questions_query = select(func.count(Question.id)).scalar_subquery()
 
-        user_correct_query = (
-            select(func.coalesce(func.sum(Records.score), 0))
-            .join(QuizParticipant, QuizParticipant.id == Records.participant_id)
-            .join(Quiz, Quiz.id == QuizParticipant.quiz_id)
-            .where(QuizParticipant.user_id == user_id)
-            .scalar_subquery()
-        )
+            user_correct_query = (
+                select(func.coalesce(func.sum(Records.score), 0))
+                .join(QuizParticipant, QuizParticipant.id == Records.participant_id)
+                .join(Quiz, Quiz.id == QuizParticipant.quiz_id)
+                .where(QuizParticipant.user_id == user_id)
+                .scalar_subquery()
+            )
 
-        query = select(
-            (user_correct_query * 100 / func.nullif(total_questions_query, 0))
-        )
+            query = select(
+                (user_correct_query * 100 / func.nullif(total_questions_query, 0))
+            )
 
-        result = await self.session.execute(query)
-        return result.scalar_one_or_none() or 0
+            result = await self.session.execute(query)
+            return result.scalar_one_or_none() or 0
+        except SQLAlchemyError as e:
+            logger.error(f"SQLAlchemyError: {e}")
+            raise AppException(detail="Database exception occurred.")

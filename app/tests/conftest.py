@@ -6,16 +6,23 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy import insert
 
 from app.models.company_model import Company
-from app.models.quiz_model import Answer, Question, Quiz, QuizParticipant, Records
-from app.services.quiz import quiz_services
-from app.services.user import user_services
-from app.services.company import company_services
+from app.models.quiz_model import (
+    Answer,
+    Question,
+    Quiz,
+    QuizParticipant,
+    Records,
+    SelectedAnswers,
+)
+from app.services.quiz import get_quiz_service
+from app.services.user import get_user_service
+from app.services.company import get_company_service
 from app.db.unit_of_work import UnitOfWork
 from app.utils.settings_model import settings
 from app.models.user_model import User
 from app.models.membership_model import Memberships, MembershipRequests, RoleEnum
-from app.services.admin import admin_services
-from app.services.membership import membership_services
+from app.services.admin import get_admin_service
+from app.services.membership import get_membership_service
 from app.utils.db import clear_tables
 
 
@@ -35,7 +42,7 @@ async def db_session():
 async def redis_client():
     client = await fakeredis.aioredis.FakeRedis()
     yield client
-    await client.close()
+    await client.aclose()
 
 
 @pytest.fixture
@@ -44,7 +51,7 @@ def user_services_fixture(db_session, monkeypatch):
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.user.UnitOfWork", unit_of_work_with_session)
-    return user_services
+    return get_user_service()
 
 
 @pytest.fixture
@@ -53,7 +60,7 @@ def company_services_fixture(db_session, monkeypatch):
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.company.UnitOfWork", unit_of_work_with_session)
-    return company_services
+    return get_company_service()
 
 
 @pytest.fixture
@@ -62,7 +69,7 @@ def membership_services_fixture(db_session, monkeypatch):
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.membership.UnitOfWork", unit_of_work_with_session)
-    return membership_services
+    return get_membership_service()
 
 
 @pytest.fixture
@@ -71,7 +78,7 @@ def admin_services_fixture(db_session, monkeypatch):
         return UnitOfWork(session=db_session)
 
     monkeypatch.setattr("app.services.admin.UnitOfWork", unit_of_work_with_session)
-    return admin_services
+    return get_admin_service()
 
 
 @pytest.fixture
@@ -81,7 +88,7 @@ def quiz_services_fixture(db_session, redis_client, monkeypatch):
 
     monkeypatch.setattr("app.services.quiz.UnitOfWork", unit_of_work_with_session)
     monkeypatch.setattr("app.services.quiz.get_redis_client", lambda: redis_client)
-    return quiz_services
+    return get_quiz_service()
 
 
 @pytest_asyncio.fixture
@@ -105,7 +112,7 @@ async def test_company(db_session, test_user):
     )
     company_id = result.one()[0]
     await db_session.commit()
-    return {"id": company_id, "owner": test_user["id"]}
+    return {"id": company_id, "owner": test_user["id"], "email": test_user["email"]}
 
 
 @pytest_asyncio.fixture
@@ -128,7 +135,9 @@ async def test_membership_request(db_session, test_user, test_company):
 async def test_membership(db_session, test_user, test_company):
     result = await db_session.execute(
         insert(Memberships)
-        .values(user_id=test_user["id"], company_id=test_company["id"])
+        .values(
+            user_id=test_user["id"], company_id=test_company["id"], role=RoleEnum.OWNER
+        )
         .returning(Memberships.id)
     )
     membership_id = result.one()[0]
@@ -138,6 +147,7 @@ async def test_membership(db_session, test_user, test_company):
         "user_id": test_user["id"],
         "company_id": test_company["id"],
         "owner": test_company["owner"],
+        "user_email": test_user["email"],
     }
 
 
@@ -217,11 +227,17 @@ async def test_quiz(db_session, test_company):
             title="Test quiz",
             description="Test quiz",
             company_id=test_company["id"],
+            frequency=1,
         )
         .returning(Quiz.id)
     )
     quiz_id = result.one()[0]
-    return {"id": quiz_id, "company_id": test_company["id"]}
+    return {
+        "id": quiz_id,
+        "company_id": test_company["id"],
+        "user_id": test_company["owner"],
+        "user_email": test_company["email"],
+    }
 
 
 @pytest_asyncio.fixture
@@ -247,3 +263,14 @@ async def test_record(db_session, test_participant):
     )
     record_id = result.one()[0]
     return {"id": record_id, "participant_id": test_participant["id"]}
+
+
+@pytest_asyncio.fixture
+async def test_selected_answer(db_session, test_answers, test_record):
+    result = await db_session.execute(
+        insert(SelectedAnswers)
+        .values(record_id=test_record["id"], answer_id=test_answers["id1"])
+        .returning(SelectedAnswers.id)
+    )
+    answer_id = result.one()[0]
+    return {"id": answer_id, "record_id": test_record["id"]}

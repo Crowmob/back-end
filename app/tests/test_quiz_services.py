@@ -12,18 +12,24 @@ from app.schemas.quiz import (
     AnswerID,
     AnswerDetailResponse,
 )
-from app.models.quiz_model import Quiz, Question, Answer, QuizParticipant, Records
+from app.models.quiz_model import (
+    Quiz,
+    Question,
+    Answer,
+    QuizParticipant,
+    Records,
+    SelectedAnswers,
+)
 
 
 @pytest.mark.asyncio
 async def test_create_quiz(db_session, quiz_services_fixture, test_company):
     quiz1 = QuizWithQuestionsSchema(
-        id=1,
         title="Test Quiz",
         description="Test description",
+        frequency=1,
         questions=[
             QuestionWithAnswersSchema(
-                id=1,
                 text="Test text",
                 answers=[
                     AnswerDetailResponse(id=1, text="Test answer", is_correct=True),
@@ -31,7 +37,6 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
                 ],
             ),
             QuestionWithAnswersSchema(
-                id=2,
                 text="Test text",
                 answers=[
                     AnswerDetailResponse(id=3, text="Test answer", is_correct=True),
@@ -41,7 +46,7 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
         ],
     )
     quiz_id = await quiz_services_fixture.create_quiz(
-        company_id=test_company["id"], quiz_id=None, quiz=quiz1
+        company_id=test_company["id"], quiz_id="null", quiz=quiz1
     )
     assert isinstance(quiz_id, int)
 
@@ -49,30 +54,12 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
 @pytest.mark.asyncio
 async def test_get_all_quizzes(db_session, quiz_services_fixture, test_quiz):
     quizzes = await quiz_services_fixture.get_all_quizzes(
-        company_id=test_quiz["company_id"], limit=5, offset=0
+        company_id=test_quiz["company_id"],
+        limit=5,
+        offset=0,
+        current_user_id=test_quiz["user_id"],
     )
     assert quizzes.count >= 1
-
-
-@pytest.mark.asyncio
-async def test_get_all_questions(db_session, quiz_services_fixture, test_questions):
-    questions = await quiz_services_fixture.get_all_questions(
-        quiz_id=test_questions["quiz_id"], limit=5, offset=0
-    )
-    assert questions.count == 2
-
-
-@pytest.mark.asyncio
-async def test_get_all_answers(db_session, quiz_services_fixture, test_answers):
-    answers1 = await quiz_services_fixture.get_all_answers(
-        question_id=test_answers["question_id1"]
-    )
-    assert len(answers1) == 2
-
-    answers2 = await quiz_services_fixture.get_all_answers(
-        question_id=test_answers["question_id2"]
-    )
-    assert len(answers2) == 2
 
 
 @pytest.mark.asyncio
@@ -109,51 +96,17 @@ async def test_delete_quiz(
 
 
 @pytest.mark.asyncio
-async def test_delete_question(
-    db_session, quiz_services_fixture, test_questions, test_answers
-):
-    for question_id in [test_questions["id1"], test_questions["id2"]]:
-        await quiz_services_fixture.delete_question(question_id=question_id)
-        question = await db_session.scalar(
-            select(Question).where(Question.id == question_id)
-        )
-        assert question is None
-    for answer_id in [
-        test_answers["id1"],
-        test_answers["id2"],
-        test_answers["id3"],
-        test_answers["id4"],
-    ]:
-        answer = await db_session.scalar(select(Answer).where(Answer.id == answer_id))
-        assert answer is None
-
-
-@pytest.mark.asyncio
-async def test_delete_answer(db_session, quiz_services_fixture, test_answers):
-    for answer_id in [
-        test_answers["id1"],
-        test_answers["id2"],
-        test_answers["id3"],
-        test_answers["id4"],
-    ]:
-        await quiz_services_fixture.delete_answer(answer_id=answer_id)
-        answer = await db_session.scalar(select(Answer).where(Answer.id == answer_id))
-        assert answer is None
-
-
-@pytest.mark.asyncio
 async def test_get_average_score_in_company(
-    test_user,
-    test_company,
     test_quiz,
     test_questions,
     test_answers,
     test_participant,
     test_record,
+    test_membership,
     quiz_services_fixture,
 ):
     score = await quiz_services_fixture.get_average_score_in_company(
-        user_id=test_user["id"], company_id=test_company["id"]
+        user_id=test_membership["owner"], company_id=test_membership["company_id"]
     )
     assert score == 50
 
@@ -206,7 +159,9 @@ async def test_quiz_submit(
             ),
         ],
     )
-    participant_id, record_id = await quiz_services_fixture.quiz_submit(data)
+    participant_id, record_id, answer_ids = await quiz_services_fixture.quiz_submit(
+        data, test_user["id"]
+    )
 
     participant = await db_session.execute(
         select(QuizParticipant).where(QuizParticipant.id == participant_id)
@@ -218,7 +173,132 @@ async def test_quiz_submit(
     assert record.score == 1
 
     cached_raw = await redis_client.get(
-        f"{participant_id}:{record_id}:{data.questions[0].answers[0].id}"
+        f"{test_user['id']}:{test_quiz['id']}:{test_company['id']}:{answer_ids[0]}"
     )
     cached_answer = json.loads(cached_raw.decode("utf-8"))
     assert cached_answer["company_id"] == data.company_id
+
+
+@pytest.mark.asyncio
+async def test_get_all_quizzes_data_for_user_in_company(
+    quiz_services_fixture,
+    redis_client,
+    db_session,
+    test_quiz,
+    test_selected_answer,
+    test_company,
+    test_answers,
+    test_participant,
+    test_user,
+    test_record,
+):
+    await redis_client.set(
+        f"{test_user['id']}:{test_quiz['id']}:{test_company['id']}:{test_selected_answer['id']}",
+        json.dumps(
+            {
+                "quiz_id": test_quiz["id"],
+                "company_id": test_company["id"],
+                "answer_id": test_selected_answer["id"],
+                "participant_id": test_participant["id"],
+                "user_id": test_user["id"],
+                "record_id": test_selected_answer["record_id"],
+            }
+        ),
+        ex=172800,
+    )
+    selected_answer = SelectedAnswers(
+        answer_id=test_answers["id1"], record_id=test_record["id"]
+    )
+    db_session.add(selected_answer)
+    await db_session.commit()
+
+    data = await quiz_services_fixture.get_quiz_data_for_user(
+        user_id=test_user["id"],
+        company_id=test_company["id"],
+        current_user_id=test_user["id"],
+    )
+
+    assert len(data) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_quiz_data_for_user_in_company(
+    quiz_services_fixture,
+    redis_client,
+    db_session,
+    test_quiz,
+    test_selected_answer,
+    test_company,
+    test_answers,
+    test_participant,
+    test_user,
+    test_record,
+):
+    await redis_client.set(
+        f"{test_user['id']}:{test_quiz['id']}:{test_company['id']}:{test_selected_answer['id']}",
+        json.dumps(
+            {
+                "quiz_id": test_quiz["id"],
+                "company_id": test_company["id"],
+                "answer_id": test_selected_answer["id"],
+                "participant_id": test_participant["id"],
+                "user_id": test_user["id"],
+                "record_id": test_selected_answer["record_id"],
+            }
+        ),
+        ex=172800,
+    )
+    selected_answer = SelectedAnswers(
+        answer_id=test_answers["id1"], record_id=test_record["id"]
+    )
+    db_session.add(selected_answer)
+    await db_session.commit()
+
+    data = await quiz_services_fixture.get_quiz_data_for_user(
+        user_id=test_user["id"],
+        quiz_id=test_quiz["id"],
+        company_id=test_company["id"],
+        current_user_id=test_user["id"],
+    )
+
+    assert len(data) == 2
+
+
+@pytest.mark.asyncio
+async def test_all_quizzes_data_for_user(
+    quiz_services_fixture,
+    redis_client,
+    db_session,
+    test_quiz,
+    test_selected_answer,
+    test_company,
+    test_answers,
+    test_participant,
+    test_user,
+    test_record,
+):
+    await redis_client.set(
+        f"{test_user['id']}:{test_quiz['id']}:{test_company['id']}:{test_selected_answer['id']}",
+        json.dumps(
+            {
+                "quiz_id": test_quiz["id"],
+                "company_id": test_company["id"],
+                "answer_id": test_selected_answer["id"],
+                "participant_id": test_participant["id"],
+                "user_id": test_user["id"],
+                "record_id": test_selected_answer["record_id"],
+            }
+        ),
+        ex=172800,
+    )
+    selected_answer = SelectedAnswers(
+        answer_id=test_answers["id1"], record_id=test_record["id"]
+    )
+    db_session.add(selected_answer)
+    await db_session.commit()
+
+    data = await quiz_services_fixture.get_quiz_data_for_user(
+        user_id=test_user["id"], current_user_id=test_user["id"]
+    )
+
+    assert len(data) == 2
