@@ -35,7 +35,6 @@ class CompanyServices:
                 owner=owner, name=name, description=description, private=private
             )
             company_id = await uow.companies.create(company.model_dump())
-            logger.info(RoleEnum.OWNER.value)
             membership = MembershipSchema(
                 user_id=owner, company_id=company_id, role=RoleEnum.OWNER.value
             )
