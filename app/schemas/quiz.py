@@ -55,7 +55,7 @@ class QuestionDetailResponse(IDMixin, QuestionSchema, BaseModel):
 
 class QuizDetailResponse(IDMixin, QuizSchema, BaseModel):
     is_available: bool
-    last_completed_at: datetime
+    last_completed_at: datetime = None
 
 
 class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):

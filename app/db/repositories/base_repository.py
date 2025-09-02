@@ -89,6 +89,10 @@ class BaseRepository(Generic[ModelType]):
                     else:
                         query = query.where(column == value)
 
+            if extra_filters:
+                for f in extra_filters:
+                    query = query.where(f)
+
             query = query.offset(offset or 0).limit(limit or 10)
 
             result = await self.session.execute(query)

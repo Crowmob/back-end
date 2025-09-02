@@ -113,7 +113,7 @@ class QuizServices:
     ):
         async with UnitOfWork() as uow:
             items, total_count = await uow.quizzes.get_all_quizzes(
-                company_id, current_user_id, limit, offset
+                current_user_id, company_id, limit, offset
             )
             logger.info(items)
             items = [
@@ -122,9 +122,9 @@ class QuizServices:
                     title=quiz.title,
                     description=quiz.description,
                     frequency=quiz.frequency,
-                    is_available=is_available,
+                    is_available=quiz.is_available,
                 )
-                for quiz, *_ignored, is_available in items
+                for quiz in items
             ]
 
             return ListResponse[QuizDetailResponse](items=items, count=total_count)
@@ -232,7 +232,6 @@ class QuizServices:
                     for _, _, average_score, completed_at in scores[1]
                 ],
             )
-            logger.info(response)
             return response
 
     @staticmethod
@@ -257,7 +256,6 @@ class QuizServices:
                     for title, description, completed_at, average_score in scores[1]
                 ],
             )
-            logger.info(response)
             return response
 
     @staticmethod
@@ -299,7 +297,6 @@ class QuizServices:
                 }
                 for answer in result
             ]
-            logger.info(quiz_data)
             return quiz_data
 
 
