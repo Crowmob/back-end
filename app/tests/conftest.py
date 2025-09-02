@@ -135,7 +135,9 @@ async def test_membership_request(db_session, test_user, test_company):
 async def test_membership(db_session, test_user, test_company):
     result = await db_session.execute(
         insert(Memberships)
-        .values(user_id=test_user["id"], company_id=test_company["id"])
+        .values(
+            user_id=test_user["id"], company_id=test_company["id"], role=RoleEnum.OWNER
+        )
         .returning(Memberships.id)
     )
     membership_id = result.one()[0]

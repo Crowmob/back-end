@@ -56,9 +56,9 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
 async def test_get_all_quizzes(db_session, quiz_services_fixture, test_quiz):
     quizzes = await quiz_services_fixture.get_all_quizzes(
         company_id=test_quiz["company_id"],
-        email=test_quiz["user_email"],
         limit=5,
         offset=0,
+        current_user_id=test_quiz["user_id"],
     )
     assert quizzes.count >= 1
 
@@ -98,20 +98,22 @@ async def test_delete_quiz(
 
 @pytest.mark.asyncio
 async def test_get_average_score_in_company(
-    test_user,
-    test_company,
     test_quiz,
     test_questions,
     test_answers,
     test_participant,
     test_record,
+    test_membership,
     quiz_services_fixture,
 ):
     from_date = datetime.date.today() - datetime.timedelta(days=1)
     to_date = datetime.date.today() + datetime.timedelta(days=1)
 
     scores = await quiz_services_fixture.get_average_score_in_company(
-        company_id=test_company["id"], from_date=from_date, to_date=to_date
+        user_id=test_membership["owner"],
+        company_id=test_membership["company_id"],
+        from_date=from_date,
+        to_date=to_date,
     )
     assert scores[0] == 50
     assert len(scores[1]) == 1
@@ -170,7 +172,7 @@ async def test_quiz_submit(
         ],
     )
     participant_id, record_id, answer_ids = await quiz_services_fixture.quiz_submit(
-        data
+        data, test_user["id"]
     )
 
     participant = await db_session.execute(
@@ -223,7 +225,9 @@ async def test_get_all_quizzes_data_for_user_in_company(
     await db_session.commit()
 
     data = await quiz_services_fixture.get_quiz_data_for_user(
-        test_user["email"], user_id=test_user["id"], company_id=test_company["id"]
+        user_id=test_user["id"],
+        company_id=test_company["id"],
+        current_user_id=test_user["id"],
     )
 
     assert len(data) == 2
@@ -263,10 +267,10 @@ async def test_get_quiz_data_for_user_in_company(
     await db_session.commit()
 
     data = await quiz_services_fixture.get_quiz_data_for_user(
-        test_user["email"],
         user_id=test_user["id"],
         quiz_id=test_quiz["id"],
         company_id=test_company["id"],
+        current_user_id=test_user["id"],
     )
 
     assert len(data) == 2
@@ -306,7 +310,7 @@ async def test_all_quizzes_data_for_user(
     await db_session.commit()
 
     data = await quiz_services_fixture.get_quiz_data_for_user(
-        test_user["email"], user_id=test_user["id"]
+        user_id=test_user["id"], current_user_id=test_user["id"]
     )
 
     assert len(data) == 2

@@ -1,10 +1,16 @@
+import logging
+
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, and_, or_
 
+from app.core.exceptions.exceptions import AppException
 from app.models.company_model import Company
 from app.models.membership_model import Memberships
 from app.db.repositories.base_repository import BaseRepository
+
+logger = logging.getLogger(__name__)
 
 
 class CompanyRepository(BaseRepository[Company]):
@@ -40,19 +46,23 @@ class CompanyRepository(BaseRepository[Company]):
         return items, total_count
 
     async def get_company_by_id(self, company_id: int, current_user: int):
-        query = (
-            select(Company)
-            .join(Memberships, Company.id == Memberships.company_id, isouter=True)
-            .where(
-                and_(
-                    Company.id == company_id,
-                    or_(
-                        Company.private == False,
-                        Memberships.user_id == current_user,
-                    ),
+        try:
+            query = (
+                select(Company)
+                .join(Memberships, Company.id == Memberships.company_id, isouter=True)
+                .where(
+                    and_(
+                        Company.id == company_id,
+                        or_(
+                            Company.private == False,
+                            Memberships.user_id == current_user,
+                        ),
+                    )
                 )
             )
-        )
-        result = await self.session.execute(query)
-        company = result.scalars().first()
-        return company
+            result = await self.session.execute(query)
+            company = result.scalars().first()
+            return company
+        except SQLAlchemyError as e:
+            logger.error(f"SQLAlchemyError in get_all: {e}")
+            raise AppException("Database exception occurred.")
