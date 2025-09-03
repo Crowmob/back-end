@@ -46,19 +46,15 @@ class CompanyServices:
     async def get_all_companies(
         limit: int | None = None,
         offset: int | None = None,
-        email: str | None = None,
+        current_user_id: int | None = None,
     ):
         async with UnitOfWork() as uow:
-            if email:
-                user = await uow.users.get_user_by_email(email)
-            else:
-                user = None
-            if user:
+            if current_user_id is not None:
                 (
                     items,
                     total_count,
                 ) = await uow.companies.get_all_companies_for_owner(
-                    limit, offset, user.id
+                    limit, offset, current_user_id
                 )
             else:
                 items, total_count = await uow.companies.get_all(
@@ -91,7 +87,7 @@ class CompanyServices:
             raise NotFoundException(detail=f"No company found with id={company_id}")
         company = CompanyDetailResponse.model_validate(result)
         logger.info(f"Fetched company with id={company_id}")
-        owner = await uow.users.get_by_id(company.owner)
+        owner = await uow.users.get_one(id=company.owner)
         if current_user_email == owner.email:
             company.is_owner = True
         return company
@@ -121,8 +117,8 @@ class CompanyServices:
                 name=name, description=description, private=private
             )
             await uow.companies.update(
-                company_id,
-                update_model.model_dump(),
+                id=company_id,
+                data=update_model.model_dump(),
             )
             logger.info(f"Company updated: id={company_id}")
             return ResponseModel(

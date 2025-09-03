@@ -68,7 +68,7 @@ class UserServices:
 
     @staticmethod
     async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
-        user = await uow.users.get_by_id(user_id)
+        user = await uow.users.get_one(id=user_id)
         if not user:
             logger.warning(f"No user found with id={user_id}")
             raise NotFoundException(detail=f"No user found with id={user_id}")
@@ -91,7 +91,7 @@ class UserServices:
     @staticmethod
     async def get_user_by_email(email: str):
         async with UnitOfWork() as uow:
-            user = await uow.users.get_user_by_email(email)
+            user = await uow.users.get_one(email=email)
             if not user:
                 logger.warning(f"No user found with email={email}")
                 raise NotFoundException(detail=f"No user found with email={email}")
@@ -136,8 +136,8 @@ class UserServices:
                 else (user.avatar.split(".")[-1] if user.avatar else None),
             )
             await uow.users.update(
-                user_id,
-                update_model.model_dump(),
+                id=user_id,
+                data=update_model.model_dump(),
             )
             logger.info(f"User updated: id={user_id}")
 
@@ -146,7 +146,9 @@ class UserServices:
             user = await self.get_user_by_id_with_uow(user_id, uow)
             if user.id != current_user_id:
                 raise ForbiddenException(detail=f"You cannot delete another user")
-            await uow.users.delete_user(user_id)
+            await uow.users.update(
+                user_id=user_id, data={"about": None, "has_profile": False}
+            )
             logger.info(f"User deleted: id={user_id}")
 
 

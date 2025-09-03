@@ -3,7 +3,7 @@ from typing import Generic, TypeVar, Type
 
 from sqlalchemy.exc import DataError, SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, func, insert
+from sqlalchemy import select, update, delete, func, insert, and_
 
 from app.core.exceptions.exceptions import AppException, BadRequestException
 
@@ -50,10 +50,16 @@ class BaseRepository(Generic[ModelType]):
             logger.error(f"SQLAlchemyError: {e}")
             raise AppException(detail="Database exception occurred.")
 
-    async def get_by_id(self, obj_id: int):
-        result = await self.session.execute(
-            select(self.model).where(self.model.id == obj_id)
+    async def get_one(self, **filters):
+        stmt = select(self.model).where(
+            and_(
+                *(
+                    getattr(self.model, field) == value
+                    for field, value in filters.items()
+                )
+            )
         )
+        result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
     async def get_all(
@@ -112,10 +118,19 @@ class BaseRepository(Generic[ModelType]):
             logger.error(f"SQLAlchemyError in get_all: {e}")
             raise AppException("Database exception occurred.")
 
-    async def update(self, obj_id: int, data: dict):
+    async def update(self, data: dict, **filters):
         try:
             await self.session.execute(
-                update(self.model).where(self.model.id == obj_id).values(**data)
+                update(self.model)
+                .where(
+                    and_(
+                        *(
+                            getattr(self.model, field) == value
+                            for field, value in filters.items()
+                        )
+                    )
+                )
+                .values(**data)
             )
         except IntegrityError as e:
             logger.error(f"IntegrityError: {e}")
@@ -127,10 +142,17 @@ class BaseRepository(Generic[ModelType]):
             logger.error(f"SQLAlchemyError: {e}")
             raise AppException(detail="Database exception occurred.")
 
-    async def delete(self, obj_id: int):
+    async def delete(self, **filters):
         try:
             await self.session.execute(
-                delete(self.model).where(self.model.id == obj_id)
+                delete(self.model).where(
+                    and_(
+                        *(
+                            getattr(self.model, field) == value
+                            for field, value in filters.items()
+                        )
+                    )
+                )
             )
         except SQLAlchemyError as e:
             logger.error(f"SQLAlchemyError: {e}")

@@ -26,8 +26,8 @@ class MembershipServices:
     @staticmethod
     async def send_membership_request(request_type: str, company_id: int, user_id: int):
         async with UnitOfWork() as uow:
-            membership_request = await uow.membership_requests.get_membership_request(
-                request_type, company_id, user_id
+            membership_request = await uow.membership_requests.get_one(
+                type=request_type, company_id=company_id, user_id=user_id
             )
             logger.info(membership_request)
             if not membership_request:
@@ -44,7 +44,9 @@ class MembershipServices:
     @staticmethod
     async def get_membership(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            result = await uow.memberships.get_membership(user_id, company_id)
+            result = await uow.memberships.get_one(
+                user_id=user_id, company_id=company_id
+            )
             if not result:
                 return None
             return MembershipDetailResponse.model_validate(result)
@@ -52,7 +54,7 @@ class MembershipServices:
     @staticmethod
     async def cancel_membership_request(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            await uow.membership_requests.delete_membership_request(user_id, company_id)
+            await uow.membership_requests.delete(user_id=user_id, company_id=company_id)
             logger.info(f"Deleted membership request")
 
     @staticmethod
@@ -78,9 +80,7 @@ class MembershipServices:
     @staticmethod
     async def delete_membership(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            await uow.memberships.delete_membership(
-                user_id=user_id, company_id=company_id
-            )
+            await uow.memberships.delete(user_id=user_id, company_id=company_id)
 
     @staticmethod
     async def get_membership_requests_for_user(

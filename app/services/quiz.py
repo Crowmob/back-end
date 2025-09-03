@@ -1,7 +1,9 @@
 import datetime
 import logging
+from sqlite3 import IntegrityError, DataError
 
 from redis.exceptions import RedisError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.enums.enums import RoleEnum
 from app.core.exceptions.exceptions import (
@@ -81,7 +83,7 @@ class QuizServices:
     @staticmethod
     async def get_quiz_by_id(quiz_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            quiz = await uow.quizzes.get_quiz_by_id(quiz_id, company_id)
+            quiz = await uow.quizzes.get_one(id=quiz_id, company_id=company_id)
             if not quiz:
                 raise NotFoundException(detail="Quiz not found")
             return QuizWithQuestionsDetailResponse(
@@ -134,19 +136,19 @@ class QuizServices:
         quiz_id: int, title: str | None = None, description: str | None = None
     ):
         async with UnitOfWork() as uow:
-            quiz = await uow.quizzes.get_by_id(quiz_id)
+            quiz = await uow.quizzes.get_one(id=quiz_id)
             if not quiz:
                 raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
             update_model = QuizUpdateSchema(
                 title=title,
                 description=description,
             )
-            await uow.quizzes.update(quiz_id, update_model.model_dump())
+            await uow.quizzes.update(id=quiz_id, data=update_model.model_dump())
 
     @staticmethod
     async def delete_quiz(quiz_id):
         async with UnitOfWork() as uow:
-            quiz = await uow.quizzes.get_by_id(quiz_id)
+            quiz = await uow.quizzes.get_one(id=quiz_id)
             if not quiz:
                 raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
             await uow.quizzes.delete(quiz_id)
@@ -159,8 +161,8 @@ class QuizServices:
                 raise ForbiddenException(
                     detail="You cannot submit a quiz for another user"
                 )
-            result = await uow.participants.get_quiz_participant(
-                data.quiz_id, data.user_id
+            result = await uow.participants.get_one(
+                quiz_id=data.quiz_id, user_id=data.user_id
             )
             if not result:
                 participant_id = await uow.participants.create(
@@ -173,8 +175,8 @@ class QuizServices:
                 participant = QuizParticipantDetailResponse.model_validate(result)
                 participant_id = participant.id
                 await uow.participants.update(
-                    participant_id,
-                    QuizParticipantUpdateSchema(
+                    id=participant_id,
+                    data=QuizParticipantUpdateSchema(
                         completed_at=datetime.datetime.now()
                     ).model_dump(),
                 )
@@ -188,7 +190,17 @@ class QuizServices:
                 for question in data.questions
                 for answer in question.answers
             ]
-            answer_ids = await uow.answers.create_selected_answers(selected_answers)
+            try:
+                answer_ids = await uow.answers.create_selected_answers(selected_answers)
+            except IntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to update. Wrong data")
+            except DataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except SQLAlchemyError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             quiz_redis_repo = QuizRedisRepository(get_redis_client())
             answers_data = [
                 {
@@ -212,7 +224,9 @@ class QuizServices:
         to_date: datetime.date,
     ):
         async with UnitOfWork() as uow:
-            membership = await uow.memberships.get_membership(user_id, company_id)
+            membership = await uow.memberships.get_one(
+                user_id=user_id, company_id=company_id
+            )
             if membership.role != RoleEnum.ADMIN and membership.role != RoleEnum.OWNER:
                 raise ForbiddenException(detail="You dont have permissions for this")
             if from_date and to_date and from_date > to_date:
@@ -229,7 +243,7 @@ class QuizServices:
                         average_score=float(average_score),
                         completed_at=completed_at,
                     )
-                    for _, _, average_score, completed_at in scores[1]
+                    for _, average_score, completed_at in scores[1]
                 ],
             )
             return response

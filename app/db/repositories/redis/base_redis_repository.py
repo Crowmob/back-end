@@ -41,6 +41,7 @@ class BaseRedisRepository(ABC):
                 logger.error(f"Redis scan failed for pattern {pattern}: {e}")
                 raise AppException("Cache scan operation failed")
             keys.extend(found_keys)
+            logger.info(cursor)
             if cursor == 0 or cursor == b"0":
                 break
 

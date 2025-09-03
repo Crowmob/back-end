@@ -2,6 +2,7 @@ import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.enums.enums import RoleEnum
 from app.core.exceptions.exceptions import (
     AppException,
     NotFoundException,
@@ -19,8 +20,10 @@ class AdminServices:
     @staticmethod
     async def appoint_admin(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            result = await uow.memberships.appoint_admin(user_id, company_id)
-            if result.rowcount == 0:
+            result = await uow.memberships.update(
+                user_id=user_id, company_id=company_id, data={"role": RoleEnum.ADMIN}
+            )
+            if not result.rowcount:
                 raise NotFoundException(
                     detail=f"User with id {user_id} is not member of company with id {company_id}"
                 )
@@ -29,8 +32,10 @@ class AdminServices:
     @staticmethod
     async def remove_admin(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            result = await uow.memberships.remove_admin(user_id, company_id)
-            if result.rowcount == 0:
+            result = await uow.memberships.update(
+                user_id=user_id, company_id=company_id, data={"role": RoleEnum.MEMBER}
+            )
+            if not result.rowcount:
                 raise NotFoundException(
                     detail=f"User with id {user_id} is not member of company with id {company_id}"
                 )
