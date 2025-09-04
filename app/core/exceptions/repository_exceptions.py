@@ -12,3 +12,15 @@ class RepositoryDataError(RepositoryError):
 
 class RepositoryDatabaseError(RepositoryError):
     pass
+
+
+class RedisRepositoryError(RepositoryError):
+    pass
+
+
+class RedisRepositoryScanError(RepositoryError):
+    pass
+
+
+class RedisRepositoryMultipleFetchError(RepositoryError):
+    pass

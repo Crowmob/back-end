@@ -6,6 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func, insert, and_
 
 from app.core.exceptions.exceptions import AppException, BadRequestException
+from app.core.exceptions.repository_exceptions import (
+    RepositoryIntegrityError,
+    RepositoryDataError,
+    RepositoryDatabaseError,
+)
 
 ModelType = TypeVar("ModelType")
 logger = logging.getLogger(__name__)
@@ -23,15 +28,12 @@ class BaseRepository(Generic[ModelType]):
             await self.session.flush()
             await self.session.refresh(new)
             return new.id
-        except IntegrityError as e:
-            logger.error(f"IntegrityError: {e}")
-            raise BadRequestException(detail="Failed to update. Wrong data")
-        except DataError as e:
-            logger.error(f"Data error: {e}")
-            raise BadRequestException(detail="Invalid format or length of fields")
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+        except IntegrityError:
+            raise RepositoryIntegrityError
+        except DataError:
+            raise RepositoryDataError
+        except SQLAlchemyError:
+            raise RepositoryDatabaseError
 
     async def create_many(self, data: list[dict]):
         try:
@@ -40,27 +42,27 @@ class BaseRepository(Generic[ModelType]):
             stmt = insert(self.model).values(data).returning(self.model.id)
             result = await self.session.execute(stmt)
             return [row[0] for row in result.fetchall()]
-        except IntegrityError as e:
-            logger.error(f"IntegrityError: {e}")
-            raise BadRequestException(detail="Failed to update. Wrong data")
-        except DataError as e:
-            logger.error(f"Data error: {e}")
-            raise BadRequestException(detail="Invalid format or length of fields")
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+        except IntegrityError:
+            raise RepositoryIntegrityError
+        except DataError:
+            raise RepositoryDataError
+        except SQLAlchemyError:
+            raise RepositoryDatabaseError
 
     async def get_one(self, **filters):
-        stmt = select(self.model).where(
-            and_(
-                *(
-                    getattr(self.model, field) == value
-                    for field, value in filters.items()
+        try:
+            stmt = select(self.model).where(
+                and_(
+                    *(
+                        getattr(self.model, field) == value
+                        for field, value in filters.items()
+                    )
                 )
             )
-        )
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
+            result = await self.session.execute(stmt)
+            return result.scalar_one_or_none()
+        except SQLAlchemyError:
+            raise RepositoryDatabaseError
 
     async def get_all(
         self,
@@ -114,9 +116,8 @@ class BaseRepository(Generic[ModelType]):
 
             total_count = rows[0][-1]
             return items, total_count
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError in get_all: {e}")
-            raise AppException("Database exception occurred.")
+        except SQLAlchemyError:
+            raise RepositoryDatabaseError
 
     async def update(self, data: dict, **filters):
         try:
@@ -132,15 +133,12 @@ class BaseRepository(Generic[ModelType]):
                 )
                 .values(**data)
             )
-        except IntegrityError as e:
-            logger.error(f"IntegrityError: {e}")
-            raise BadRequestException(detail="Failed to update. Wrong data")
-        except DataError as e:
-            logger.error(f"Data error: {e}")
-            raise BadRequestException(detail="Invalid format or length of fields")
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+        except IntegrityError:
+            raise RepositoryIntegrityError
+        except DataError:
+            raise RepositoryDataError
+        except SQLAlchemyError:
+            raise RepositoryDatabaseError
 
     async def delete(self, **filters):
         try:

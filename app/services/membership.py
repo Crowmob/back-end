@@ -1,11 +1,17 @@
 import logging
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.exceptions.repository_exceptions import (
+    RepositoryDatabaseError,
+    RepositoryIntegrityError,
+    RepositoryDataError,
+)
 from app.db.unit_of_work import UnitOfWork
 from app.core.exceptions.exceptions import (
     NotFoundException,
     AppException,
     UnauthorizedException,
+    BadRequestException,
 )
 from app.core.enums.enums import RoleEnum
 from app.schemas.company import CompanyDetailResponse
@@ -26,17 +32,35 @@ class MembershipServices:
     @staticmethod
     async def send_membership_request(request_type: str, company_id: int, user_id: int):
         async with UnitOfWork() as uow:
-            membership_request = await uow.membership_requests.get_one(
-                type=request_type, company_id=company_id, user_id=user_id
-            )
+            try:
+                membership_request = await uow.membership_requests.get_one(
+                    type=request_type, company_id=company_id, user_id=user_id
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(membership_request)
             if not membership_request:
                 new_request = MembershipRequestSchema(
                     type=request_type, company_id=company_id, user_id=user_id
                 )
-                membership_id = await uow.membership_requests.create(
-                    new_request.model_dump()
-                )
+                try:
+                    membership_id = await uow.membership_requests.create(
+                        new_request.model_dump()
+                    )
+                except RepositoryIntegrityError as e:
+                    logger.error(f"IntegrityError: {e}")
+                    raise BadRequestException(
+                        detail="Failed to create user. Wrong data"
+                    )
+                except RepositoryDataError as e:
+                    logger.error(f"Data error: {e}")
+                    raise BadRequestException(
+                        detail="Invalid format or length of fields"
+                    )
+                except RepositoryDatabaseError as e:
+                    logger.error(f"SQLAlchemyError: {e}")
+                    raise AppException(detail="Database exception occurred.")
                 logger.info("Created membership request")
                 return membership_id
             return membership_request.id
@@ -44,9 +68,13 @@ class MembershipServices:
     @staticmethod
     async def get_membership(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            result = await uow.memberships.get_one(
-                user_id=user_id, company_id=company_id
-            )
+            try:
+                result = await uow.memberships.get_one(
+                    user_id=user_id, company_id=company_id
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             if not result:
                 return None
             return MembershipDetailResponse.model_validate(result)
@@ -54,7 +82,13 @@ class MembershipServices:
     @staticmethod
     async def cancel_membership_request(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            await uow.membership_requests.delete(user_id=user_id, company_id=company_id)
+            try:
+                await uow.membership_requests.delete(
+                    user_id=user_id, company_id=company_id
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(f"Deleted membership request")
 
     @staticmethod
@@ -73,14 +107,30 @@ class MembershipServices:
                 user_id=user_id,
                 company_id=company_id,
             )
-            membership_id = await uow.memberships.create(membership.model_dump())
+            try:
+                membership_id = await uow.memberships.create(membership.model_dump())
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(
+                    detail="Failed to create membership request. Wrong data"
+                )
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info("Created membership successfully")
             return membership_id
 
     @staticmethod
     async def delete_membership(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            await uow.memberships.delete(user_id=user_id, company_id=company_id)
+            try:
+                await uow.memberships.delete(user_id=user_id, company_id=company_id)
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def get_membership_requests_for_user(
@@ -90,18 +140,26 @@ class MembershipServices:
         offset: int | None = None,
     ):
         async with UnitOfWork() as uow:
-            membership_requests = (
-                await uow.membership_requests.get_membership_requests_for_user(
-                    request_type, user_id, limit, offset
+            try:
+                membership_requests = (
+                    await uow.membership_requests.get_membership_requests_for_user(
+                        request_type, user_id, limit, offset
+                    )
                 )
-            )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             company_ids = [request.company_id for request in membership_requests]
             if not company_ids:
                 items, total_count = [], 0
             else:
-                items, total_count = await uow.companies.get_companies_by_ids(
-                    company_ids
-                )
+                try:
+                    items, total_count = await uow.companies.get_companies_by_ids(
+                        company_ids
+                    )
+                except RepositoryDatabaseError as e:
+                    logger.error(f"SQLAlchemyError: {e}")
+                    raise AppException(detail="Database exception occurred.")
             return ListResponse[CompanyDetailResponse](
                 items=[
                     CompanyDetailResponse(
@@ -124,12 +182,16 @@ class MembershipServices:
         offset: int | None = None,
     ):
         async with UnitOfWork() as uow:
-            (
-                items,
-                total_count,
-            ) = await uow.membership_requests.get_membership_requests_to_company(
-                request_type, company_id, limit, offset
-            )
+            try:
+                (
+                    items,
+                    total_count,
+                ) = await uow.membership_requests.get_membership_requests_to_company(
+                    request_type, company_id, limit, offset
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             membership_requests = [
                 MembershipRequestDetailResponse(
                     id=req.id,
@@ -146,7 +208,11 @@ class MembershipServices:
             if not user_ids:
                 items, total_count = [], 0
             else:
-                items, total_count = await uow.users.get_users_by_ids(user_ids)
+                try:
+                    items, total_count = await uow.users.get_users_by_ids(user_ids)
+                except RepositoryDatabaseError as e:
+                    logger.error(f"SQLAlchemyError: {e}")
+                    raise AppException(detail="Database exception occurred.")
             return ListResponse[UserDetailResponse](
                 items=[
                     UserDetailResponse(
@@ -172,9 +238,13 @@ class MembershipServices:
         offset: int | None = None,
     ):
         async with UnitOfWork() as uow:
-            items, total_count = await uow.companies.get_companies_for_user(
-                user_id, limit, offset
-            )
+            try:
+                items, total_count = await uow.companies.get_companies_for_user(
+                    user_id, limit, offset
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             items = [
                 CompanyDetailResponse(
                     id=company.id,
@@ -195,9 +265,13 @@ class MembershipServices:
         offset: int | None = None,
     ):
         async with UnitOfWork() as uow:
-            items, total_count = await uow.users.get_users_in_company(
-                company_id, limit, offset
-            )
+            try:
+                items, total_count = await uow.users.get_users_in_company(
+                    company_id, limit, offset
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             items = [
                 MemberDetailResponse(
                     id=user.id,

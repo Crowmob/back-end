@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions.exceptions import AppException, BadRequestException
+from app.core.exceptions.repository_exceptions import RepositoryDatabaseError
 from app.db.repositories.base_repository import BaseRepository
 from app.models.quiz_model import (
     QuizParticipant,
@@ -103,6 +104,5 @@ class QuizRepository(BaseRepository[Quiz]):
             rows = result.fetchall()
 
             return rows
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+        except SQLAlchemyError:
+            raise RepositoryDatabaseError

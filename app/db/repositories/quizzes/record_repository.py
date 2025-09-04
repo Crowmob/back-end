@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.exceptions import AppException
+from app.core.exceptions.repository_exceptions import RepositoryDatabaseError
 from app.db.repositories.base_repository import BaseRepository
 from app.models.quiz_model import Records, Question, Quiz, QuizParticipant
 
@@ -78,9 +79,8 @@ class RecordsRepository(BaseRepository[Records]):
             overall_average = sum(row.average_score for row in scores) / len(scores)
             return overall_average, scores
 
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+        except SQLAlchemyError:
+            raise RepositoryDatabaseError
 
     async def get_average_score_in_system(
         self, user_id: int, from_date: date | None = None, to_date: date | None = None
@@ -145,6 +145,5 @@ class RecordsRepository(BaseRepository[Records]):
             overall_average = sum(row.average_score for row in scores) / len(scores)
             return overall_average, scores
 
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+        except SQLAlchemyError:
+            raise RepositoryDatabaseError

@@ -12,6 +12,14 @@ from app.core.exceptions.exceptions import (
     BadRequestException,
     ForbiddenException,
 )
+from app.core.exceptions.repository_exceptions import (
+    RepositoryIntegrityError,
+    RepositoryDataError,
+    RepositoryDatabaseError,
+    RedisRepositoryScanError,
+    RedisRepositoryMultipleFetchError,
+    RedisRepositoryError,
+)
 from app.db.redis_init import get_redis_client
 from app.db.repositories.redis.quiz_redis_repository import QuizRedisRepository
 from app.db.unit_of_work import UnitOfWork
@@ -48,42 +56,57 @@ class QuizServices:
     ):
         async with UnitOfWork() as uow:
             quiz_id = None if quiz_id == "null" else int(quiz_id)
-            if quiz_id is not None:
-                await uow.quizzes.delete(quiz_id)
-            quiz_id = await uow.quizzes.create(
-                QuizCreateSchema(
-                    title=quiz.title,
-                    description=quiz.description,
-                    company_id=company_id,
-                    frequency=quiz.frequency,
-                ).model_dump()
-            )
-            questions_data = [
-                QuestionCreateSchema(
-                    text=question.text,
-                    quiz_id=quiz_id,
-                ).model_dump()
-                for question in quiz.questions
-            ]
-            question_ids = await uow.questions.create_many(questions_data)
-            answers_data = []
-            for question, question_id in zip(quiz.questions, question_ids):
-                for answer in question.answers:
-                    answers_data.append(
-                        AnswerCreateSchema(
-                            text=answer.text,
-                            is_correct=answer.is_correct,
-                            question_id=question_id,
+            try:
+                if quiz_id is not None:
+                    await uow.quizzes.delete(quiz_id)
+
+                    quiz_id = await uow.quizzes.create(
+                        QuizCreateSchema(
+                            title=quiz.title,
+                            description=quiz.description,
+                            company_id=company_id,
+                            frequency=quiz.frequency,
                         ).model_dump()
                     )
-            await uow.answers.create_many(answers_data)
+                    questions_data = [
+                        QuestionCreateSchema(
+                            text=question.text,
+                            quiz_id=quiz_id,
+                        ).model_dump()
+                        for question in quiz.questions
+                    ]
+                    question_ids = await uow.questions.create_many(questions_data)
+                    answers_data = []
+                    for question, question_id in zip(quiz.questions, question_ids):
+                        for answer in question.answers:
+                            answers_data.append(
+                                AnswerCreateSchema(
+                                    text=answer.text,
+                                    is_correct=answer.is_correct,
+                                    question_id=question_id,
+                                ).model_dump()
+                            )
+                    await uow.answers.create_many(answers_data)
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to create quiz. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(f"Created quiz id: {quiz_id}")
             return quiz_id
 
     @staticmethod
     async def get_quiz_by_id(quiz_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            quiz = await uow.quizzes.get_one(id=quiz_id, company_id=company_id)
+            try:
+                quiz = await uow.quizzes.get_one(id=quiz_id, company_id=company_id)
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             if not quiz:
                 raise NotFoundException(detail="Quiz not found")
             return QuizWithQuestionsDetailResponse(
@@ -114,9 +137,13 @@ class QuizServices:
         current_user_id: int = None,
     ):
         async with UnitOfWork() as uow:
-            items, total_count = await uow.quizzes.get_all_quizzes(
-                current_user_id, company_id, limit, offset
-            )
+            try:
+                items, total_count = await uow.quizzes.get_all_quizzes(
+                    current_user_id, company_id, limit, offset
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(items)
             items = [
                 QuizDetailResponse(
@@ -136,19 +163,37 @@ class QuizServices:
         quiz_id: int, title: str | None = None, description: str | None = None
     ):
         async with UnitOfWork() as uow:
-            quiz = await uow.quizzes.get_one(id=quiz_id)
+            try:
+                quiz = await uow.quizzes.get_one(id=quiz_id)
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             if not quiz:
                 raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
             update_model = QuizUpdateSchema(
                 title=title,
                 description=description,
             )
-            await uow.quizzes.update(id=quiz_id, data=update_model.model_dump())
+            try:
+                await uow.quizzes.update(id=quiz_id, data=update_model.model_dump())
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to update quiz. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
 
     @staticmethod
     async def delete_quiz(quiz_id):
         async with UnitOfWork() as uow:
-            quiz = await uow.quizzes.get_one(id=quiz_id)
+            try:
+                quiz = await uow.quizzes.get_one(id=quiz_id)
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             if not quiz:
                 raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
             await uow.quizzes.delete(quiz_id)
@@ -161,30 +206,72 @@ class QuizServices:
                 raise ForbiddenException(
                     detail="You cannot submit a quiz for another user"
                 )
-            result = await uow.participants.get_one(
-                quiz_id=data.quiz_id, user_id=data.user_id
-            )
-            if not result:
-                participant_id = await uow.participants.create(
-                    QuizParticipantCreateSchema(
-                        quiz_id=data.quiz_id, user_id=data.user_id
-                    ).model_dump()
+            try:
+                result = await uow.participants.get_one(
+                    quiz_id=data.quiz_id, user_id=data.user_id
                 )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
+            if not result:
+                try:
+                    participant_id = await uow.participants.create(
+                        QuizParticipantCreateSchema(
+                            quiz_id=data.quiz_id, user_id=data.user_id
+                        ).model_dump()
+                    )
+                except RepositoryIntegrityError as e:
+                    logger.error(f"IntegrityError: {e}")
+                    raise BadRequestException(
+                        detail="Failed to create participant. Wrong data"
+                    )
+                except RepositoryDataError as e:
+                    logger.error(f"Data error: {e}")
+                    raise BadRequestException(
+                        detail="Invalid format or length of fields"
+                    )
+                except RepositoryDatabaseError as e:
+                    logger.error(f"SQLAlchemyError: {e}")
+                    raise AppException(detail="Database exception occurred.")
                 logger.info(f"Created quiz participant")
             else:
                 participant = QuizParticipantDetailResponse.model_validate(result)
                 participant_id = participant.id
-                await uow.participants.update(
-                    id=participant_id,
-                    data=QuizParticipantUpdateSchema(
-                        completed_at=datetime.datetime.now()
-                    ).model_dump(),
+                try:
+                    await uow.participants.update(
+                        id=participant_id,
+                        data=QuizParticipantUpdateSchema(
+                            completed_at=datetime.datetime.now()
+                        ).model_dump(),
+                    )
+                except RepositoryIntegrityError as e:
+                    logger.error(f"IntegrityError: {e}")
+                    raise BadRequestException(
+                        detail="Failed to update participant. Wrong data"
+                    )
+                except RepositoryDataError as e:
+                    logger.error(f"Data error: {e}")
+                    raise BadRequestException(
+                        detail="Invalid format or length of fields"
+                    )
+                except RepositoryDatabaseError as e:
+                    logger.error(f"SQLAlchemyError: {e}")
+                    raise AppException(detail="Database exception occurred.")
+            try:
+                record_id = await uow.records.create(
+                    RecordCreateSchema(
+                        participant_id=participant_id, score=data.score
+                    ).model_dump()
                 )
-            record_id = await uow.records.create(
-                RecordCreateSchema(
-                    participant_id=participant_id, score=data.score
-                ).model_dump()
-            )
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to create record. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             selected_answers = [
                 SelectedAnswers(record_id=record_id, answer_id=answer.id)
                 for question in data.questions
@@ -192,15 +279,18 @@ class QuizServices:
             ]
             try:
                 answer_ids = await uow.answers.create_selected_answers(selected_answers)
-            except IntegrityError as e:
+            except RepositoryIntegrityError as e:
                 logger.error(f"IntegrityError: {e}")
-                raise BadRequestException(detail="Failed to update. Wrong data")
-            except DataError as e:
+                raise BadRequestException(
+                    detail="Failed creating selected answers. Wrong data"
+                )
+            except RepositoryDataError as e:
                 logger.error(f"Data error: {e}")
                 raise BadRequestException(detail="Invalid format or length of fields")
-            except SQLAlchemyError as e:
+            except RepositoryDatabaseError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise AppException(detail="Database exception occurred.")
+
             quiz_redis_repo = QuizRedisRepository(get_redis_client())
             answers_data = [
                 {
@@ -213,7 +303,11 @@ class QuizServices:
                 }
                 for answer_id in answer_ids
             ]
-            await quiz_redis_repo.save_answers(answers_data)
+            try:
+                await quiz_redis_repo.save_answers(answers_data)
+            except RedisRepositoryError as e:
+                logger.error(f"Redis error: {e}")
+                raise AppException(detail="Cache exception occurred.")
             return participant_id, record_id, answer_ids
 
     @staticmethod
@@ -224,16 +318,24 @@ class QuizServices:
         to_date: datetime.date,
     ):
         async with UnitOfWork() as uow:
-            membership = await uow.memberships.get_one(
-                user_id=user_id, company_id=company_id
-            )
+            try:
+                membership = await uow.memberships.get_one(
+                    user_id=user_id, company_id=company_id
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             if membership.role != RoleEnum.ADMIN and membership.role != RoleEnum.OWNER:
                 raise ForbiddenException(detail="You dont have permissions for this")
             if from_date and to_date and from_date > to_date:
                 raise BadRequestException(detail="Start date must be before end date")
-            scores = await uow.records.get_average_score_in_company(
-                user_id, company_id, from_date, to_date
-            )
+            try:
+                scores = await uow.records.get_average_score_in_company(
+                    user_id, company_id, from_date, to_date
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             response = QuizAverageResponse(
                 overall_average=float(scores[0]),
                 scores=[
@@ -255,9 +357,13 @@ class QuizServices:
         to_date: datetime.date = None,
     ):
         async with UnitOfWork() as uow:
-            scores = await uow.records.get_average_score_in_system(
-                user_id, from_date, to_date
-            )
+            try:
+                scores = await uow.records.get_average_score_in_system(
+                    user_id, from_date, to_date
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             response = QuizAverageResponse(
                 overall_average=float(scores[0]),
                 scores=[
@@ -282,14 +388,25 @@ class QuizServices:
         async with UnitOfWork() as uow:
             user_id = user_id if user_id is not None else current_user_id
             quiz_redis_repo = QuizRedisRepository(get_redis_client())
-            answers = await quiz_redis_repo.get_answers_for_user(
-                user_id, quiz_id, company_id
-            )
+            try:
+                answers = await quiz_redis_repo.get_answers_for_user(
+                    user_id, quiz_id, company_id
+                )
+            except RedisRepositoryScanError as e:
+                logger.error(f"Redis scan failed: {e}")
+                raise AppException("Cache scan operation failed")
+            except RedisRepositoryMultipleFetchError as e:
+                logger.error(f"Redis mget failed: {e}")
+                raise AppException("Cache get operation failed")
             answer_ids = [answer["answer_id"] for answer in answers]
             answers = list(answers)
-            missing_answers = await uow.answers.get_missing_answers(
-                answer_ids, user_id, quiz_id, company_id
-            )
+            try:
+                missing_answers = await uow.answers.get_missing_answers(
+                    answer_ids, user_id, quiz_id, company_id
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             answers.extend(
                 [
                     {
@@ -298,9 +415,13 @@ class QuizServices:
                     for answer in missing_answers
                 ]
             )
-            result = await uow.quizzes.get_full_quiz_data_for_user(
-                [answer["answer_id"] for answer in answers]
-            )
+            try:
+                result = await uow.quizzes.get_full_quiz_data_for_user(
+                    [answer["answer_id"] for answer in answers]
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             quiz_data = [
                 {
                     "quiz_title": answer.quiz_title,

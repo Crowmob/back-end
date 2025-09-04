@@ -7,6 +7,12 @@ from app.core.exceptions.exceptions import (
     AppException,
     NotFoundException,
     UnauthorizedException,
+    BadRequestException,
+)
+from app.core.exceptions.repository_exceptions import (
+    RepositoryDatabaseError,
+    RepositoryIntegrityError,
+    RepositoryDataError,
 )
 from app.db.unit_of_work import UnitOfWork
 from app.schemas.response_models import ListResponse, ResponseModel
@@ -20,9 +26,21 @@ class AdminServices:
     @staticmethod
     async def appoint_admin(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            result = await uow.memberships.update(
-                user_id=user_id, company_id=company_id, data={"role": RoleEnum.ADMIN}
-            )
+            try:
+                result = await uow.memberships.update(
+                    user_id=user_id,
+                    company_id=company_id,
+                    data={"role": RoleEnum.ADMIN},
+                )
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to appoint admin. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             if not result.rowcount:
                 raise NotFoundException(
                     detail=f"User with id {user_id} is not member of company with id {company_id}"
@@ -32,9 +50,21 @@ class AdminServices:
     @staticmethod
     async def remove_admin(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
-            result = await uow.memberships.update(
-                user_id=user_id, company_id=company_id, data={"role": RoleEnum.MEMBER}
-            )
+            try:
+                result = await uow.memberships.update(
+                    user_id=user_id,
+                    company_id=company_id,
+                    data={"role": RoleEnum.MEMBER},
+                )
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to remove admin. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             if not result.rowcount:
                 raise NotFoundException(
                     detail=f"User with id {user_id} is not member of company with id {company_id}"
@@ -48,9 +78,13 @@ class AdminServices:
         offset: int | None = None,
     ):
         async with UnitOfWork() as uow:
-            items, total_count = await uow.users.get_all_admins(
-                company_id, limit, offset
-            )
+            try:
+                items, total_count = await uow.users.get_all_admins(
+                    company_id, limit, offset
+                )
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             items = [
                 MemberDetailResponse(
                     id=user.id,

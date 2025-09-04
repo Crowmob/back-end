@@ -1,6 +1,11 @@
 import logging
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DataError
 
+from app.core.exceptions.repository_exceptions import (
+    RepositoryDatabaseError,
+    RepositoryIntegrityError,
+    RepositoryDataError,
+)
 from app.db.unit_of_work import UnitOfWork
 from app.core.exceptions.exceptions import (
     NotFoundException,
@@ -34,11 +39,31 @@ class CompanyServices:
             company = CompanySchema(
                 owner=owner, name=name, description=description, private=private
             )
-            company_id = await uow.companies.create(company.model_dump())
+            try:
+                company_id = await uow.companies.create(company.model_dump())
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to create company. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             membership = MembershipSchema(
                 user_id=owner, company_id=company_id, role=RoleEnum.OWNER.value
             )
-            await uow.memberships.create(membership.model_dump())
+            try:
+                await uow.memberships.create(membership.model_dump())
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to create company. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(f"Company created: {name}")
             return company_id
 
@@ -50,16 +75,24 @@ class CompanyServices:
     ):
         async with UnitOfWork() as uow:
             if current_user_id is not None:
-                (
-                    items,
-                    total_count,
-                ) = await uow.companies.get_all_companies_for_owner(
-                    limit, offset, current_user_id
-                )
+                try:
+                    (
+                        items,
+                        total_count,
+                    ) = await uow.companies.get_all_companies_for_owner(
+                        limit, offset, current_user_id
+                    )
+                except RepositoryDatabaseError as e:
+                    logger.error(f"SQLAlchemyError: {e}")
+                    raise AppException(detail="Database exception occurred.")
             else:
-                items, total_count = await uow.companies.get_all(
-                    filters={"private": False}, limit=limit, offset=offset
-                )
+                try:
+                    items, total_count = await uow.companies.get_all(
+                        filters={"private": False}, limit=limit, offset=offset
+                    )
+                except RepositoryDatabaseError as e:
+                    logger.error(f"SQLAlchemyError: {e}")
+                    raise AppException(detail="Database exception occurred.")
             companies = ListResponse[CompanyDetailResponse](
                 items=[
                     CompanyDetailResponse(
@@ -87,7 +120,11 @@ class CompanyServices:
             raise NotFoundException(detail=f"No company found with id={company_id}")
         company = CompanyDetailResponse.model_validate(result)
         logger.info(f"Fetched company with id={company_id}")
-        owner = await uow.users.get_one(id=company.owner)
+        try:
+            owner = await uow.users.get_one(id=company.owner)
+        except RepositoryDatabaseError as e:
+            logger.error(f"SQLAlchemyError: {e}")
+            raise AppException(detail="Database exception occurred.")
         if current_user_email == owner.email:
             company.is_owner = True
         return company
@@ -116,10 +153,20 @@ class CompanyServices:
             update_model = CompanyUpdateRequestModel(
                 name=name, description=description, private=private
             )
-            await uow.companies.update(
-                id=company_id,
-                data=update_model.model_dump(),
-            )
+            try:
+                await uow.companies.update(
+                    id=company_id,
+                    data=update_model.model_dump(),
+                )
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to update company. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(f"Company updated: id={company_id}")
             return ResponseModel(
                 status_code=200, message="Company updated successfully"
