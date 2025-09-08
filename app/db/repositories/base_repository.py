@@ -3,7 +3,7 @@ from typing import Generic, TypeVar, Type
 
 from sqlalchemy.exc import DataError, SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, func, insert, and_
+from sqlalchemy import select, update, delete, func, insert, and_, case
 
 from app.core.exceptions.exceptions import AppException, BadRequestException
 from app.core.exceptions.repository_exceptions import (
@@ -28,26 +28,24 @@ class BaseRepository(Generic[ModelType]):
             await self.session.flush()
             await self.session.refresh(new)
             return new.id
-        except IntegrityError:
-            raise RepositoryIntegrityError
-        except DataError:
-            raise RepositoryDataError
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except IntegrityError as e:
+            raise RepositoryIntegrityError(f"Integrity error: {e}") from e
+        except DataError as e:
+            raise RepositoryDataError(f"Invalid data: {e}") from e
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def create_many(self, data: list[dict]):
         try:
-            if not data:
-                return []
             stmt = insert(self.model).values(data).returning(self.model.id)
             result = await self.session.execute(stmt)
             return [row[0] for row in result.fetchall()]
-        except IntegrityError:
-            raise RepositoryIntegrityError
-        except DataError:
-            raise RepositoryDataError
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except IntegrityError as e:
+            raise RepositoryIntegrityError(f"Integrity error: {e}") from e
+        except DataError as e:
+            raise RepositoryDataError(f"Invalid data: {e}") from e
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def get_one(self, **filters):
         try:
@@ -61,8 +59,8 @@ class BaseRepository(Generic[ModelType]):
             )
             result = await self.session.execute(stmt)
             return result.scalar_one_or_none()
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def get_all(
         self,
@@ -75,11 +73,13 @@ class BaseRepository(Generic[ModelType]):
         extra_columns: list = None,
     ):
         try:
-            query = select(
-                self.model,
-                *(extra_columns or []),
-                func.count().over().label("total_count"),
-            ).distinct(self.model.id)
+            query = (
+                select(self.model)
+                .add_columns(
+                    *(extra_columns or []), func.count().over().label("total_count")
+                )
+                .distinct(self.model.id)
+            )
 
             if joins:
                 for join_args in joins:
@@ -109,15 +109,19 @@ class BaseRepository(Generic[ModelType]):
             if not rows:
                 return [], 0
 
-            if extra_columns:
-                items = [tuple(row[:-1]) for row in rows]
-            else:
-                items = [row[0] for row in rows]
+            items = []
+            for row in rows:
+                quiz_obj = row[0]
+                if extra_columns:
+                    for idx, col in enumerate(extra_columns, start=1):
+                        setattr(quiz_obj, col.key, row[idx])
+                items.append(quiz_obj)
 
             total_count = rows[0][-1]
             return items, total_count
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def update(self, data: dict, **filters):
         try:
@@ -133,12 +137,26 @@ class BaseRepository(Generic[ModelType]):
                 )
                 .values(**data)
             )
-        except IntegrityError:
-            raise RepositoryIntegrityError
-        except DataError:
-            raise RepositoryDataError
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except IntegrityError as e:
+            raise RepositoryIntegrityError(f"Integrity error: {e}") from e
+        except DataError as e:
+            raise RepositoryDataError(f"Invalid data: {e}") from e
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
+
+    async def update_many(self, data: list[dict]):
+        ids = [d["id"] for d in data]
+
+        stmt_values = {}
+        for key in data[0].keys():
+            if key == "id":
+                continue
+            stmt_values[key] = case(
+                {d["id"]: d[key] for d in data}, value=self.model.id
+            )
+        await self.session.execute(
+            update(self.model).where(self.model.id.in_(ids)).values(**stmt_values)
+        )
 
     async def delete(self, **filters):
         try:
@@ -153,5 +171,10 @@ class BaseRepository(Generic[ModelType]):
                 )
             )
         except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
+
+    async def delete_many(self, ids: list[int]):
+        try:
+            await self.session.execute(delete(self.model).where(self.model.id.in_(ids)))
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e

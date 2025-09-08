@@ -1,12 +1,16 @@
 import logging
 
-from sqlalchemy import select, func, and_, Integer, cast, case, text
+from sqlalchemy import select, func, and_, Integer, cast, case, text, insert
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DataError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions.exceptions import AppException, BadRequestException
-from app.core.exceptions.repository_exceptions import RepositoryDatabaseError
+from app.core.exceptions.repository_exceptions import (
+    RepositoryDatabaseError,
+    RepositoryIntegrityError,
+    RepositoryDataError,
+)
 from app.db.repositories.base_repository import BaseRepository
 from app.models.quiz_model import (
     QuizParticipant,
@@ -83,6 +87,24 @@ class QuizRepository(BaseRepository[Quiz]):
         )
         return items, total_count
 
+    async def get_quiz_by_id(self, quiz_id: int, company_id: int):
+        try:
+            stmt = (
+                select(Quiz)
+                .where(Quiz.id == quiz_id, Quiz.company_id == company_id)
+                .options(selectinload(Quiz.questions).selectinload(Question.answers))
+            )
+            result = await self.session.execute(stmt)
+            quiz = result.scalar_one_or_none()
+
+            if quiz is None:
+                return None
+
+            return quiz
+        except SQLAlchemyError as e:
+            logger.error(f"SQLAlchemyError: {e}")
+            raise AppException(detail="Database exception occurred.")
+
     async def get_full_quiz_data_for_user(self, selected_answer_ids: list[int]):
         try:
             query = (
@@ -104,5 +126,41 @@ class QuizRepository(BaseRepository[Quiz]):
             rows = result.fetchall()
 
             return rows
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
+
+    async def save_questions_and_answers(
+        self, quiz_id, questions: list[dict], answers: list[dict]
+    ):
+        try:
+            stmt = insert(Question).returning(Question.id, Question.text)
+            result = await self.session.execute(
+                stmt, [{"text": q["text"], "quiz_id": quiz_id} for q in questions]
+            )
+            created_questions = result.fetchall()
+
+            id_map = {
+                old["id"]: new_id
+                for old, (new_id, _) in zip(questions, created_questions)
+            }
+
+            stmt = insert(Answer)
+            answer_values = []
+            for a in answers:
+                old_qid = a["question_id"]
+
+                answer_values.append(
+                    {
+                        "question_id": id_map[old_qid],
+                        "text": a["text"],
+                        "is_correct": a["is_correct"],
+                    }
+                )
+
+            await self.session.execute(stmt, answer_values)
+        except IntegrityError as e:
+            raise RepositoryIntegrityError(f"Integrity error: {e}") from e
+        except DataError as e:
+            raise RepositoryDataError(f"Invalid data: {e}") from e
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e

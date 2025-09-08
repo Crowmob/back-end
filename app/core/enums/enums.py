@@ -10,3 +10,9 @@ class RoleEnum(Enum):
 class FileFormat(Enum):
     CSV = "csv"
     JSON = "json"
+
+
+class QuizActions(Enum):
+    create = "create"
+    update = "update"
+    delete = "delete"

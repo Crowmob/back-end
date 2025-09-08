@@ -79,8 +79,8 @@ class RecordsRepository(BaseRepository[Records]):
             overall_average = sum(row.average_score for row in scores) / len(scores)
             return overall_average, scores
 
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def get_average_score_in_system(
         self, user_id: int, from_date: date | None = None, to_date: date | None = None
@@ -145,5 +145,5 @@ class RecordsRepository(BaseRepository[Records]):
             overall_average = sum(row.average_score for row in scores) / len(scores)
             return overall_average, scores
 
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e

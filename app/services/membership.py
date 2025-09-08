@@ -252,9 +252,9 @@ class MembershipServices:
                     name=company.name,
                     description=company.description,
                     private=company.private,
-                    user_role=role,
+                    user_role=company.role,
                 )
-                for company, role in items
+                for company in items
             ]
             return ListResponse[CompanyDetailResponse](items=items, count=total_count)
 
@@ -272,19 +272,20 @@ class MembershipServices:
             except RepositoryDatabaseError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise AppException(detail="Database exception occurred.")
+            logger.info(items)
             items = [
                 MemberDetailResponse(
                     id=user.id,
                     username=user.username,
                     email=user.email,
                     about=user.about,
-                    role=role,
+                    role=user.role,
                     avatar=f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
                     if user.avatar_ext
                     else None,
-                    last_completed_at=last_quiz_time,
+                    last_completed_at=user.last_quiz_time,
                 )
-                for user, role, last_quiz_time in items
+                for user in items
             ]
             return ListResponse[MemberDetailResponse](items=items, count=total_count)
 

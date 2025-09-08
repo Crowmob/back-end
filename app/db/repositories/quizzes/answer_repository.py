@@ -32,12 +32,12 @@ class AnswerRepository(BaseRepository[Answer]):
             await self.session.flush()
             ids = [answer.id for answer in selected_answers]
             return ids
-        except IntegrityError:
-            raise RepositoryIntegrityError
-        except DataError:
-            raise RepositoryDataError
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except IntegrityError as e:
+            raise RepositoryIntegrityError(f"Integrity error: {e}") from e
+        except DataError as e:
+            raise RepositoryDataError(f"Invalid data: {e}") from e
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def get_missing_answers(
         self,
@@ -67,5 +67,5 @@ class AnswerRepository(BaseRepository[Answer]):
             result = await self.session.execute(query)
             rows = result.scalars().all()
             return rows
-        except SQLAlchemyError:
-            raise RepositoryDatabaseError
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e

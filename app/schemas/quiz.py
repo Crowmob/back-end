@@ -97,8 +97,9 @@ class RecordCreateSchema(BaseModel):
 
 
 class QuizUpdateSchema(BaseModel):
-    title: str | None = None
-    description: str | None = None
+    title: str
+    description: str
+    frequency: int
 
 
 class QuestionUpdateSchema(BaseModel):
@@ -155,3 +156,18 @@ class QuizAverageResponse(BaseModel):
 class QuizAverageRequest(BaseModel):
     from_date: date | None = None
     till_date: date | None = None
+
+
+class UpdatedQuestionSchema(IDMixin, QuestionSchema, BaseModel):
+    action: str
+    quiz_id: int
+
+
+class UpdatedAnswerSchema(IDMixin, AnswerSchema, BaseModel):
+    action: str
+    question_id: int
+
+
+class QuizUpdateRequest(QuizSchema, BaseModel):
+    updated_questions: list[UpdatedQuestionSchema]
+    updated_answers: list[UpdatedAnswerSchema]

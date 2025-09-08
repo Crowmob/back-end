@@ -5,7 +5,7 @@ from sqlite3 import IntegrityError, DataError
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.enums.enums import RoleEnum
+from app.core.enums.enums import RoleEnum, QuizActions
 from app.core.exceptions.exceptions import (
     AppException,
     NotFoundException,
@@ -41,6 +41,8 @@ from app.schemas.quiz import (
     QuizParticipantDetailResponse,
     QuizAverageResponse,
     QuizScoreItem,
+    UpdatedQuestionSchema,
+    UpdatedAnswerSchema,
 )
 from app.schemas.response_models import ListResponse
 
@@ -51,42 +53,37 @@ class QuizServices:
     @staticmethod
     async def create_quiz(
         company_id: int,
-        quiz_id: int | str,
         quiz: QuizWithQuestionsSchema,
     ):
         async with UnitOfWork() as uow:
-            quiz_id = None if quiz_id == "null" else int(quiz_id)
             try:
-                if quiz_id is not None:
-                    await uow.quizzes.delete(quiz_id)
-
-                    quiz_id = await uow.quizzes.create(
-                        QuizCreateSchema(
-                            title=quiz.title,
-                            description=quiz.description,
-                            company_id=company_id,
-                            frequency=quiz.frequency,
-                        ).model_dump()
-                    )
-                    questions_data = [
-                        QuestionCreateSchema(
-                            text=question.text,
-                            quiz_id=quiz_id,
-                        ).model_dump()
-                        for question in quiz.questions
-                    ]
-                    question_ids = await uow.questions.create_many(questions_data)
-                    answers_data = []
-                    for question, question_id in zip(quiz.questions, question_ids):
-                        for answer in question.answers:
-                            answers_data.append(
-                                AnswerCreateSchema(
-                                    text=answer.text,
-                                    is_correct=answer.is_correct,
-                                    question_id=question_id,
-                                ).model_dump()
-                            )
-                    await uow.answers.create_many(answers_data)
+                quiz_id = await uow.quizzes.create(
+                    QuizCreateSchema(
+                        title=quiz.title,
+                        description=quiz.description,
+                        company_id=company_id,
+                        frequency=quiz.frequency,
+                    ).model_dump()
+                )
+                questions_data = [
+                    QuestionCreateSchema(
+                        text=question.text,
+                        quiz_id=quiz_id,
+                    ).model_dump()
+                    for question in quiz.questions
+                ]
+                question_ids = await uow.questions.create_many(questions_data)
+                answers_data = []
+                for question, question_id in zip(quiz.questions, question_ids):
+                    for answer in question.answers:
+                        answers_data.append(
+                            AnswerCreateSchema(
+                                text=answer.text,
+                                is_correct=answer.is_correct,
+                                question_id=question_id,
+                            ).model_dump()
+                        )
+                await uow.answers.create_many(answers_data)
             except RepositoryIntegrityError as e:
                 logger.error(f"IntegrityError: {e}")
                 raise BadRequestException(detail="Failed to create quiz. Wrong data")
@@ -103,7 +100,9 @@ class QuizServices:
     async def get_quiz_by_id(quiz_id: int, company_id: int):
         async with UnitOfWork() as uow:
             try:
-                quiz = await uow.quizzes.get_one(id=quiz_id, company_id=company_id)
+                quiz = await uow.quizzes.get_quiz_by_id(
+                    quiz_id=quiz_id, company_id=company_id
+                )
             except RepositoryDatabaseError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise AppException(detail="Database exception occurred.")
@@ -160,7 +159,12 @@ class QuizServices:
 
     @staticmethod
     async def update_quiz(
-        quiz_id: int, title: str | None = None, description: str | None = None
+        quiz_id: int,
+        title: str,
+        description: str,
+        frequency: int,
+        updated_questions: list[UpdatedQuestionSchema],
+        updated_answers: list[UpdatedAnswerSchema],
     ):
         async with UnitOfWork() as uow:
             try:
@@ -170,12 +174,74 @@ class QuizServices:
                 raise AppException(detail="Database exception occurred.")
             if not quiz:
                 raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
+
+            update_questions_data = [
+                {
+                    k: v
+                    for k, v in q.model_dump(exclude_unset=True).items()
+                    if k != "action"
+                }
+                for q in updated_questions
+                if q.action == QuizActions.update
+            ]
+            update_answers_data = [
+                {
+                    k: v
+                    for k, v in a.model_dump(exclude_unset=True).items()
+                    if k != "action"
+                }
+                for a in updated_answers
+                if a.action == QuizActions.update
+            ]
+            delete_questions_ids = [
+                q.model_dump(exclude_unset=True)["id"]
+                for q in updated_questions
+                if q.action == QuizActions.delete
+            ]
+            delete_answers_ids = [
+                a.model_dump(exclude_unset=True)["id"]
+                for a in updated_answers
+                if a.action == QuizActions.delete
+            ]
+            create_questions_data = [
+                {
+                    k: v
+                    for k, v in q.model_dump(exclude_unset=True).items()
+                    if k not in {"action"}
+                }
+                for q in updated_questions
+                if q.action == QuizActions.create
+            ]
+            create_answers_data = [
+                {
+                    k: v
+                    for k, v in a.model_dump(exclude_unset=True).items()
+                    if k not in {"action"}
+                }
+                for a in updated_answers
+                if a.action == QuizActions.create
+            ]
             update_model = QuizUpdateSchema(
-                title=title,
-                description=description,
+                title=title, description=description, frequency=frequency
             )
             try:
                 await uow.quizzes.update(id=quiz_id, data=update_model.model_dump())
+
+                if create_questions_data:
+                    await uow.quizzes.save_questions_and_answers(
+                        quiz_id=quiz_id,
+                        questions=create_questions_data,
+                        answers=create_answers_data,
+                    )
+                if update_questions_data:
+                    await uow.questions.update_many(update_questions_data)
+                if update_answers_data:
+                    await uow.answers.update_many(update_answers_data)
+                if delete_questions_ids:
+                    await uow.questions.delete_many(delete_questions_ids)
+                if delete_answers_ids:
+                    await uow.answers.delete_many(delete_answers_ids)
+
             except RepositoryIntegrityError as e:
                 logger.error(f"IntegrityError: {e}")
                 raise BadRequestException(detail="Failed to update quiz. Wrong data")

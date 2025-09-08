@@ -5,7 +5,6 @@ from redis import RedisError
 from redis.asyncio import Redis
 from abc import ABC, abstractmethod
 
-from app.core.exceptions.exceptions import AppException
 from app.core.exceptions.repository_exceptions import (
     RedisRepositoryMultipleFetchError,
     RedisRepositoryScanError,
@@ -31,8 +30,8 @@ class BaseRedisRepository(ABC):
                 key = self.get_key(i)
                 await pipe.set(key, json.dumps(i), ex=expire)
             await pipe.execute()
-        except RedisError:
-            raise RedisRepositoryError
+        except RedisError as e:
+            raise RedisRepositoryError(f"Redis error: {e}") from e
 
     async def get_many(self, pattern: str):
         keys = []
@@ -41,19 +40,19 @@ class BaseRedisRepository(ABC):
         while cursor:
             try:
                 cursor, found_keys = await self.redis.scan(cursor=cursor, match=pattern)
-            except RedisError:
-                raise RedisRepositoryScanError()
+            except RedisError as e:
+                raise RedisRepositoryScanError(f"Redis scan error: {e}") from e
             keys.extend(found_keys)
             logger.info(cursor)
-            if cursor == 0 or cursor == b"0":
+            if cursor in [0, b"0"]:
                 break
 
         if not keys:
             return []
         try:
             values = await self.redis.mget(*keys)
-        except RedisError:
-            raise RedisRepositoryMultipleFetchError
+        except RedisError as e:
+            raise RedisRepositoryMultipleFetchError(f"Redis mget error: {e}") from e
 
         items = [json.loads(v.decode()) for v in values if v is not None]
         return items
