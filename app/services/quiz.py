@@ -178,48 +178,48 @@ class QuizServices:
             questions_to_updated = [
                 {
                     key: value
-                    for key, value in question.model_dump(exclude_unset=True).items()
+                    for key, value in question.model_dump().items()
                     if key != "action"
                 }
                 for question in updated_questions
-                if question.action == QuizActions.update
+                if question.action == QuizActions.update.value
             ]
             answers_to_update = [
                 {
                     key: value
-                    for key, value in answer.model_dump(exclude_unset=True).items()
+                    for key, value in answer.model_dump().items()
                     if key != "action"
                 }
                 for answer in updated_answers
-                if answer.action == QuizActions.update
+                if answer.action == QuizActions.update.value
             ]
             questions_to_delete = [
-                question.model_dump(exclude_unset=True)["id"]
+                question.model_dump()["id"]
                 for question in updated_questions
-                if question.action == QuizActions.delete
+                if question.action == QuizActions.delete.value
             ]
             answers_to_delete = [
-                answer.model_dump(exclude_unset=True)["id"]
+                answer.model_dump()["id"]
                 for answer in updated_answers
-                if answer.action == QuizActions.delete
+                if answer.action == QuizActions.delete.value
             ]
             questions_to_create = [
                 {
                     key: value
-                    for key, value in question.model_dump(exclude_unset=True).items()
+                    for key, value in question.model_dump().items()
                     if key not in {"action"}
                 }
                 for question in updated_questions
-                if question.action == QuizActions.create
+                if question.action == QuizActions.create.value
             ]
             answers_to_create = [
                 {
                     key: value
-                    for key, value in answer.model_dump(exclude_unset=True).items()
+                    for key, value in answer.model_dump().items()
                     if key not in {"action"}
                 }
                 for answer in updated_answers
-                if answer.action == QuizActions.create
+                if answer.action == QuizActions.create.value
             ]
             update_model = QuizUpdateSchema(
                 title=title, description=description, frequency=frequency
