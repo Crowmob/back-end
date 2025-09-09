@@ -185,51 +185,51 @@ class QuizServices:
             if not quiz:
                 raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
 
-            update_questions_data = [
+            questions_to_updated = [
                 {
-                    k: v
-                    for k, v in q.model_dump(exclude_unset=True).items()
-                    if k != "action"
+                    key: value
+                    for key, value in question.model_dump().items()
+                    if key != "action"
                 }
-                for q in updated_questions
-                if q.action == QuizActions.update
+                for question in updated_questions
+                if question.action == QuizActions.update.value
             ]
-            update_answers_data = [
+            answers_to_update = [
                 {
-                    k: v
-                    for k, v in a.model_dump(exclude_unset=True).items()
-                    if k != "action"
+                    key: value
+                    for key, value in answer.model_dump().items()
+                    if key != "action"
                 }
-                for a in updated_answers
-                if a.action == QuizActions.update
+                for answer in updated_answers
+                if answer.action == QuizActions.update.value
             ]
-            delete_questions_ids = [
-                q.model_dump(exclude_unset=True)["id"]
-                for q in updated_questions
-                if q.action == QuizActions.delete
+            questions_to_delete = [
+                question.model_dump()["id"]
+                for question in updated_questions
+                if question.action == QuizActions.delete.value
             ]
-            delete_answers_ids = [
-                a.model_dump(exclude_unset=True)["id"]
-                for a in updated_answers
-                if a.action == QuizActions.delete
+            answers_to_delete = [
+                answer.model_dump()["id"]
+                for answer in updated_answers
+                if answer.action == QuizActions.delete.value
             ]
-            create_questions_data = [
+            questions_to_create = [
                 {
-                    k: v
-                    for k, v in q.model_dump(exclude_unset=True).items()
-                    if k not in {"action"}
+                    key: value
+                    for key, value in question.model_dump().items()
+                    if key not in {"action"}
                 }
-                for q in updated_questions
-                if q.action == QuizActions.create
+                for question in updated_questions
+                if question.action == QuizActions.create.value
             ]
-            create_answers_data = [
+            answers_to_create = [
                 {
-                    k: v
-                    for k, v in a.model_dump(exclude_unset=True).items()
-                    if k not in {"action"}
+                    key: value
+                    for key, value in answer.model_dump().items()
+                    if key not in {"action"}
                 }
-                for a in updated_answers
-                if a.action == QuizActions.create
+                for answer in updated_answers
+                if answer.action == QuizActions.create.value
             ]
             update_model = QuizUpdateSchema(
                 title=title, description=description, frequency=frequency
@@ -237,20 +237,20 @@ class QuizServices:
             try:
                 await uow.quizzes.update(id=quiz_id, data=update_model.model_dump())
 
-                if create_questions_data:
+                if questions_to_create:
                     await uow.quizzes.save_questions_and_answers(
                         quiz_id=quiz_id,
-                        questions=create_questions_data,
-                        answers=create_answers_data,
+                        questions=questions_to_create,
+                        answers=answers_to_create,
                     )
-                if update_questions_data:
-                    await uow.questions.update_many(update_questions_data)
-                if update_answers_data:
-                    await uow.answers.update_many(update_answers_data)
-                if delete_questions_ids:
-                    await uow.questions.delete_many(delete_questions_ids)
-                if delete_answers_ids:
-                    await uow.answers.delete_many(delete_answers_ids)
+                if questions_to_updated:
+                    await uow.questions.update_many(questions_to_updated)
+                if answers_to_update:
+                    await uow.answers.update_many(answers_to_update)
+                if questions_to_delete:
+                    await uow.questions.delete_many(questions_to_delete)
+                if answers_to_delete:
+                    await uow.answers.delete_many(answers_to_delete)
 
             except RepositoryIntegrityError as e:
                 logger.error(f"IntegrityError: {e}")

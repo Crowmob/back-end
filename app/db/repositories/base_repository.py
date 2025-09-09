@@ -3,7 +3,7 @@ from typing import Generic, TypeVar, Type
 
 from sqlalchemy.exc import DataError, SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, func, insert, and_, case
+from sqlalchemy import select, update, delete, func, insert, and_, case, inspect
 
 from app.core.exceptions.exceptions import AppException, BadRequestException
 from app.core.exceptions.repository_exceptions import (
@@ -145,18 +145,29 @@ class BaseRepository(Generic[ModelType]):
             raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def update_many(self, data: list[dict]):
-        ids = [d["id"] for d in data]
+        try:
+            pk_col = inspect(self.model).primary_key[0]
+            pk_name = pk_col.name
 
-        stmt_values = {}
-        for key in data[0].keys():
-            if key == "id":
-                continue
-            stmt_values[key] = case(
-                {d["id"]: d[key] for d in data}, value=self.model.id
-            )
-        await self.session.execute(
-            update(self.model).where(self.model.id.in_(ids)).values(**stmt_values)
-        )
+            ids = [row[pk_name] for row in data]
+
+            stmt_values = {}
+            for key in data[0].keys():
+                if key == pk_name:
+                    continue
+                stmt_values[key] = case(
+                    {row[pk_name]: row[key] for row in data}, value=pk_col
+                )
+
+            stmt = update(self.model).where(pk_col.in_(ids)).values(**stmt_values)
+
+            await self.session.execute(stmt)
+        except IntegrityError as e:
+            raise RepositoryIntegrityError(f"Integrity error: {e}") from e
+        except DataError as e:
+            raise RepositoryDataError(f"Invalid data: {e}") from e
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def delete(self, **filters):
         try:
