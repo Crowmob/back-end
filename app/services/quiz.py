@@ -5,7 +5,7 @@ from sqlite3 import IntegrityError, DataError
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.enums.enums import RoleEnum, QuizActions
+from app.core.enums.enums import RoleEnum, QuizActions, NotificationStatus
 from app.core.exceptions.exceptions import (
     AppException,
     NotFoundException,
@@ -24,6 +24,7 @@ from app.db.redis_init import get_redis_client
 from app.db.repositories.redis.quiz_redis_repository import QuizRedisRepository
 from app.db.unit_of_work import UnitOfWork
 from app.models.quiz_model import SelectedAnswers
+from app.schemas.notification import NotificationSchema
 from app.schemas.quiz import (
     QuizWithQuestionsSchema,
     QuestionCreateSchema,
@@ -84,6 +85,15 @@ class QuizServices:
                             ).model_dump()
                         )
                 await uow.answers.create_many(answers_data)
+
+                company = await uow.companies.get_one({"id": company_id})
+                await uow.notifications.create(
+                    NotificationSchema(
+                        status=NotificationStatus.UNREAD,
+                        company_id=company_id,
+                        message=f"New test with name {quiz.title} has been added to company {company.name}",
+                    ).model_dump()
+                )
             except RepositoryIntegrityError as e:
                 logger.error(f"IntegrityError: {e}")
                 raise BadRequestException(detail="Failed to create quiz. Wrong data")

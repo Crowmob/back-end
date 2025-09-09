@@ -112,7 +112,7 @@ async def update_quiz(
     return ResponseModel(status_code=200, message="Created quiz")
 
 
-@quiz_router.post("/{quiz_id}", response_model=ResponseModel)
+@quiz_router.post("/submit/{quiz_id}", response_model=ResponseModel)
 async def quiz_submit(
     data: QuizSubmitRequest = Body(...),
     quiz_service: QuizServices = Depends(get_quiz_service),
@@ -153,7 +153,7 @@ async def export_all_quizzes_data_for_user(
     )
 
 
-@quiz_router.get("/export/{user_id}/{company_id}")
+@quiz_router.get("/export/user/{user_id}/{company_id}")
 async def export_all_quizzes_data_for_user_in_company(
     export_format: FileFormat,
     user_id: int,
@@ -172,11 +172,10 @@ async def export_all_quizzes_data_for_user_in_company(
     )
 
 
-@quiz_router.get("/export/{user_id}/{company_id}/{quiz_id}")
+@quiz_router.get("/export/quiz/{company_id}/{quiz_id}")
 async def export_single_quiz_data_for_user_in_company(
     quiz_id: int,
-    user_id: int,
-    company_id,
+    company_id: int,
     export_format: FileFormat,
     current_user: Annotated[
         UserDetailResponse | None, Depends(token_services.get_data_from_token)
@@ -185,7 +184,6 @@ async def export_single_quiz_data_for_user_in_company(
     export_service: ExportService = Depends(get_export_service),
 ):
     quiz_data = await quiz_service.get_quiz_data_for_user(
-        user_id=user_id,
         quiz_id=quiz_id,
         company_id=company_id,
         current_user_id=current_user.id,
