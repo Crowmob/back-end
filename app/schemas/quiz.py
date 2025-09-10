@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -55,6 +55,7 @@ class QuestionDetailResponse(IDMixin, QuestionSchema, BaseModel):
 
 class QuizDetailResponse(IDMixin, QuizSchema, BaseModel):
     is_available: bool
+    last_completed_at: datetime = None
 
 
 class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
@@ -96,8 +97,9 @@ class RecordCreateSchema(BaseModel):
 
 
 class QuizUpdateSchema(BaseModel):
-    title: str | None = None
-    description: str | None = None
+    title: str
+    description: str
+    frequency: int
 
 
 class QuestionUpdateSchema(BaseModel):
@@ -114,7 +116,7 @@ class QuizParticipantUpdateSchema(BaseModel):
 
 
 class GetAllQuizzesRequest(BaseModel):
-    company_id: int
+    company_id: int | None = None
     limit: int | None = None
     offset: int | None = None
 
@@ -137,3 +139,35 @@ class QuizSubmitRequest(BaseModel):
     user_id: int
     company_id: int
     questions: list[QuestionID]
+
+
+class QuizScoreItem(BaseModel):
+    title: str
+    description: str | None = None
+    average_score: float
+    completed_at: datetime
+
+
+class QuizAverageResponse(BaseModel):
+    overall_average: float
+    scores: list[QuizScoreItem]
+
+
+class QuizAverageRequest(BaseModel):
+    from_date: date | None = None
+    till_date: date | None = None
+
+
+class UpdatedQuestionSchema(IDMixin, QuestionSchema, BaseModel):
+    action: str
+    quiz_id: int
+
+
+class UpdatedAnswerSchema(IDMixin, AnswerSchema, BaseModel):
+    action: str
+    question_id: int
+
+
+class QuizUpdateRequest(QuizSchema, BaseModel):
+    updated_questions: list[UpdatedQuestionSchema]
+    updated_answers: list[UpdatedAnswerSchema]

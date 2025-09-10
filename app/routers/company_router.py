@@ -26,7 +26,7 @@ async def get_all_companies(
     company_service: CompanyServices = Depends(get_company_service),
 ):
     return await company_service.get_all_companies(
-        data.limit, data.offset, current_user.email
+        data.limit, data.offset, current_user.id
     )
 
 

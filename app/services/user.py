@@ -6,6 +6,11 @@ import aiofiles
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError, DataError
 from fastapi import UploadFile
 
+from app.core.exceptions.repository_exceptions import (
+    RepositoryDatabaseError,
+    RepositoryIntegrityError,
+    RepositoryDataError,
+)
 from app.db.unit_of_work import UnitOfWork
 from app.schemas.response_models import ListResponse
 from app.utils.password import password_services
@@ -40,14 +45,28 @@ class UserServices:
                 password=password,
                 avatar_ext=avatar_ext,
             )
-            user_id = await uow.users.create(user.model_dump())
+            try:
+                user_id = await uow.users.create(user.model_dump())
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to create user. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(f"User created: {username}")
             return user_id
 
     @staticmethod
     async def get_all_users(limit: int | None = None, offset: int | None = None):
         async with UnitOfWork() as uow:
-            items, total_count = await uow.users.get_all_users(limit, offset)
+            try:
+                items, total_count = await uow.users.get_all_users(limit, offset)
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             return ListResponse[UserDetailResponse](
                 items=[
                     UserDetailResponse(
@@ -68,7 +87,11 @@ class UserServices:
 
     @staticmethod
     async def get_user_by_id_with_uow(user_id: int, uow: UnitOfWork):
-        user = await uow.users.get_by_id(user_id)
+        try:
+            user = await uow.users.get_one(id=user_id)
+        except RepositoryDatabaseError as e:
+            logger.error(f"SQLAlchemyError: {e}")
+            raise AppException(detail="Database exception occurred.")
         if not user:
             logger.warning(f"No user found with id={user_id}")
             raise NotFoundException(detail=f"No user found with id={user_id}")
@@ -91,7 +114,11 @@ class UserServices:
     @staticmethod
     async def get_user_by_email(email: str):
         async with UnitOfWork() as uow:
-            user = await uow.users.get_user_by_email(email)
+            try:
+                user = await uow.users.get_one(email=email)
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             if not user:
                 logger.warning(f"No user found with email={email}")
                 raise NotFoundException(detail=f"No user found with email={email}")
@@ -135,10 +162,20 @@ class UserServices:
                 if ext
                 else (user.avatar.split(".")[-1] if user.avatar else None),
             )
-            await uow.users.update(
-                user_id,
-                update_model.model_dump(),
-            )
+            try:
+                await uow.users.update(
+                    id=user_id,
+                    data=update_model.model_dump(),
+                )
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to update user. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(f"User updated: id={user_id}")
 
     async def delete_user(self, user_id: int, current_user_id: int):
@@ -146,7 +183,19 @@ class UserServices:
             user = await self.get_user_by_id_with_uow(user_id, uow)
             if user.id != current_user_id:
                 raise ForbiddenException(detail=f"You cannot delete another user")
-            await uow.users.delete_user(user_id)
+            try:
+                await uow.users.update(
+                    user_id=user_id, data={"about": None, "has_profile": False}
+                )
+            except RepositoryIntegrityError as e:
+                logger.error(f"IntegrityError: {e}")
+                raise BadRequestException(detail="Failed to delete user. Wrong data")
+            except RepositoryDataError as e:
+                logger.error(f"Data error: {e}")
+                raise BadRequestException(detail="Invalid format or length of fields")
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
             logger.info(f"User deleted: id={user_id}")
 
 

@@ -6,6 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy import func, and_, or_
 
 from app.core.exceptions.exceptions import AppException
+from app.core.exceptions.repository_exceptions import RepositoryDatabaseError
 from app.models.company_model import Company
 from app.models.membership_model import Memberships
 from app.db.repositories.base_repository import BaseRepository
@@ -64,5 +65,4 @@ class CompanyRepository(BaseRepository[Company]):
             company = result.scalars().first()
             return company
         except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError in get_all: {e}")
-            raise AppException("Database exception occurred.")
+            raise RepositoryDatabaseError(f"Database error: {e}") from e

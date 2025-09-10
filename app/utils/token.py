@@ -2,7 +2,6 @@ import httpx
 import logging
 
 from datetime import datetime, timedelta
-
 from fastapi import Header, Depends
 from jose import JWTError, jwt
 from jose import jwk as jose_jwk

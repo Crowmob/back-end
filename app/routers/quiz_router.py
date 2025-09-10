@@ -9,9 +9,12 @@ from app.schemas.quiz import (
     QuizWithQuestionsSchema,
     QuizSubmitRequest,
     QuizWithQuestionsDetailResponse,
+    QuizAverageResponse,
+    QuizAverageRequest,
+    QuizUpdateRequest,
 )
 from app.schemas.response_models import ListResponse, ResponseModel
-from app.schemas.user import UserSchema, UserDetailResponse
+from app.schemas.user import UserDetailResponse
 from app.services.export_service import get_export_service, ExportService
 from app.services.quiz import get_quiz_service, QuizServices
 from app.utils.token import token_services
@@ -32,6 +35,36 @@ async def get_all_quizzes(
     )
 
 
+@quiz_router.get("/score/{user_id}", response_model=QuizAverageResponse)
+async def get_average_score_for_user(
+    user_id: int,
+    data: QuizAverageRequest = Depends(),
+    quiz_service: QuizServices = Depends(get_quiz_service),
+    _: Annotated[str | None, Depends(token_services.get_data_from_token)] = None,
+):
+    return await quiz_service.get_average_score_in_system(
+        user_id, data.from_date, data.till_date
+    )
+
+
+@quiz_router.get("/score/{user_id}/{company_id}", response_model=QuizAverageResponse)
+async def get_average_score_for_user_in_company(
+    user_id: int,
+    company_id: int,
+    data: QuizAverageRequest = Depends(),
+    quiz_service: QuizServices = Depends(get_quiz_service),
+    _: Annotated[
+        UserDetailResponse | None, Depends(token_services.get_data_from_token)
+    ] = None,
+):
+    return await quiz_service.get_average_score_in_company(
+        user_id,
+        company_id,
+        data.from_date,
+        data.till_date,
+    )
+
+
 @quiz_router.get(
     "/{quiz_id}/{company_id}", response_model=QuizWithQuestionsDetailResponse | None
 )
@@ -46,17 +79,36 @@ async def get_quiz_by_id(
     return await quiz_service.get_quiz_by_id(quiz_id, company_id)
 
 
-@quiz_router.post("/{company_id}/{quiz_id}", response_model=ResponseModel)
+@quiz_router.post("/{company_id}", response_model=ResponseModel)
 async def create_quiz(
     company_id: int,
-    quiz_id: int | str,
     data: QuizWithQuestionsSchema = Body(...),
     quiz_service: QuizServices = Depends(get_quiz_service),
     _: Annotated[
         UserDetailResponse | None, Depends(token_services.get_data_from_token)
     ] = None,
 ):
-    await quiz_service.create_quiz(company_id, quiz_id, data)
+    await quiz_service.create_quiz(company_id, data)
+    return ResponseModel(status_code=200, message="Created quiz")
+
+
+@quiz_router.put("/{quiz_id}", response_model=ResponseModel)
+async def update_quiz(
+    quiz_id: int,
+    data: QuizUpdateRequest = Body(...),
+    quiz_service: QuizServices = Depends(get_quiz_service),
+    _: Annotated[
+        UserDetailResponse | None, Depends(token_services.get_data_from_token)
+    ] = None,
+):
+    await quiz_service.update_quiz(
+        quiz_id,
+        data.title,
+        data.description,
+        data.frequency,
+        data.updated_questions,
+        data.updated_answers,
+    )
     return ResponseModel(status_code=200, message="Created quiz")
 
 

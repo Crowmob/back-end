@@ -1,12 +1,11 @@
 import logging
 
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError, DataError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, func, and_, Select
+from sqlalchemy import func
 
 from app.core.enums.enums import RoleEnum
-from app.core.exceptions.exceptions import AppException, BadRequestException
+from app.models.quiz_model import QuizParticipant
 from app.models.user_model import User
 from app.models.membership_model import Memberships
 from app.db.repositories.base_repository import BaseRepository
@@ -26,43 +25,23 @@ class UserRepository(BaseRepository[User]):
         )
         return items, total_count
 
-    async def get_user_by_email(self, email: int):
-        try:
-            result = await self.session.execute(select(User).where(User.email == email))
-            user = result.scalar_one_or_none()
-            if user:
-                return user
-            return None
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
-
-    async def delete_user(self, user_id: int) -> None:
-        try:
-            await self.session.execute(
-                update(User)
-                .where(User.id == user_id)
-                .values(**{"about": None, "has_profile": False})
+    async def get_users_in_company(self, company_id: int, limit=None, offset=None):
+        last_quiz_subq = (
+            select(
+                QuizParticipant.user_id,
+                func.max(QuizParticipant.completed_at).label("last_quiz_time"),
             )
-        except IntegrityError as e:
-            logger.error(f"IntegrityError: {e}")
-            raise BadRequestException(detail="Failed to update. Wrong data")
-        except DataError as e:
-            logger.error(f"Data error: {e}")
-            raise BadRequestException(detail="Invalid format or length of fields")
-        except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+            .group_by(QuizParticipant.user_id)
+            .subquery()
+        )
 
-    async def get_users_in_company(
-        self, company_id: int, limit: int | None = None, offset: int | None = None
-    ):
         items, total_count = await super().get_all(
             limit=limit,
             offset=offset,
             joins=[(Memberships, User.id == Memberships.user_id)],
+            outer_joins=[(last_quiz_subq, last_quiz_subq.c.user_id == User.id)],
             extra_filters=[Memberships.company_id == company_id],
-            extra_columns=[Memberships.role],
+            extra_columns=[Memberships.role, last_quiz_subq.c.last_quiz_time],
         )
 
         return items, total_count
@@ -77,7 +56,7 @@ class UserRepository(BaseRepository[User]):
         return items, total_count
 
     async def get_all_admins(self, company_id: int, limit=None, offset=None):
-        items, total = await super().get_all(
+        items, total_count = await super().get_all(
             limit=limit,
             offset=offset,
             joins=[(Memberships, User.id == Memberships.user_id)],
@@ -88,4 +67,4 @@ class UserRepository(BaseRepository[User]):
             extra_columns=[Memberships.role],
         )
 
-        return items, total
+        return items, total_count

@@ -25,9 +25,11 @@ async def test_get_data_from_token(mock_decode, user_services_fixture, test_user
     mock_decode.return_value = {"id": test_user["id"], "email": test_user["email"]}
 
     token = token_services.create_access_token(1)
-    credentials = f"Bearer {token}"
+    authorization_header = f"Bearer {token}"
 
-    data = await token_services.get_data_from_token(credentials, user_services_fixture)
+    data = await token_services.get_data_from_token(
+        authorization_header, user_services_fixture
+    )
     assert data.email == "test@example.com"
 
 

@@ -58,7 +58,7 @@ async def update_user_endpoint(
     ] = None,
 ):
     await user_service.update_user(
-        user_id, username, about=about, avatar=avatar, current_user=current_user
+        user_id, username, about=about, avatar=avatar, current_user_id=current_user.id
     )
     return ResponseModel(
         status_code=200, message=f"Successfully updated user with id: {user_id}!"
@@ -73,7 +73,7 @@ async def delete_user_endpoint(
         UserDetailResponse | None, Depends(token_services.get_data_from_token)
     ] = None,
 ):
-    await user_service.delete_user(user_id, current_user)
+    await user_service.delete_user(user_id, current_user.id)
     return ResponseModel(
         status_code=200, message=f"Successfully deleted user with id: {user_id}!"
     )

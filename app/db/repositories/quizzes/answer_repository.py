@@ -5,6 +5,11 @@ from sqlalchemy.exc import IntegrityError, DataError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.exceptions import AppException, BadRequestException
+from app.core.exceptions.repository_exceptions import (
+    RepositoryIntegrityError,
+    RepositoryDataError,
+    RepositoryDatabaseError,
+)
 from app.db.repositories.base_repository import BaseRepository
 from app.models.quiz_model import (
     Answer,
@@ -28,14 +33,11 @@ class AnswerRepository(BaseRepository[Answer]):
             ids = [answer.id for answer in selected_answers]
             return ids
         except IntegrityError as e:
-            logger.error(f"IntegrityError: {e}")
-            raise BadRequestException(detail="Failed to update. Wrong data")
+            raise RepositoryIntegrityError(f"Integrity error: {e}") from e
         except DataError as e:
-            logger.error(f"Data error: {e}")
-            raise BadRequestException(detail="Invalid format or length of fields")
+            raise RepositoryDataError(f"Invalid data: {e}") from e
         except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+            raise RepositoryDatabaseError(f"Database error: {e}") from e
 
     async def get_missing_answers(
         self,
@@ -66,5 +68,4 @@ class AnswerRepository(BaseRepository[Answer]):
             rows = result.scalars().all()
             return rows
         except SQLAlchemyError as e:
-            logger.error(f"SQLAlchemyError: {e}")
-            raise AppException(detail="Database exception occurred.")
+            raise RepositoryDatabaseError(f"Database error: {e}") from e

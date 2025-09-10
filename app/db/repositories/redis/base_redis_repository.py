@@ -5,7 +5,11 @@ from redis import RedisError
 from redis.asyncio import Redis
 from abc import ABC, abstractmethod
 
-from app.core.exceptions.exceptions import AppException
+from app.core.exceptions.repository_exceptions import (
+    RedisRepositoryMultipleFetchError,
+    RedisRepositoryScanError,
+    RedisRepositoryError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +31,7 @@ class BaseRedisRepository(ABC):
                 await pipe.set(key, json.dumps(i), ex=expire)
             await pipe.execute()
         except RedisError as e:
-            logger.error(f"Redis error while setting keys: {e}")
-            raise AppException("Cache operation failed")
+            raise RedisRepositoryError(f"Redis error: {e}") from e
 
     async def get_many(self, pattern: str):
         keys = []
@@ -38,10 +41,10 @@ class BaseRedisRepository(ABC):
             try:
                 cursor, found_keys = await self.redis.scan(cursor=cursor, match=pattern)
             except RedisError as e:
-                logger.error(f"Redis scan failed for pattern {pattern}: {e}")
-                raise AppException("Cache scan operation failed")
+                raise RedisRepositoryScanError(f"Redis scan error: {e}") from e
             keys.extend(found_keys)
-            if cursor == 0 or cursor == b"0":
+            logger.info(cursor)
+            if cursor in [0, b"0"]:
                 break
 
         if not keys:
@@ -49,8 +52,7 @@ class BaseRedisRepository(ABC):
         try:
             values = await self.redis.mget(*keys)
         except RedisError as e:
-            logger.error(f"Redis mget failed for keys {keys}: {e}")
-            raise AppException("Cache get operation failed")
+            raise RedisRepositoryMultipleFetchError(f"Redis mget error: {e}") from e
 
         items = [json.loads(v.decode()) for v in values if v is not None]
         return items
