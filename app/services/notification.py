@@ -38,7 +38,7 @@ class NotificationService:
                     for notification in items
                 ]
                 return ListResponse[NotificationDetailResponse](
-                    items=notifications, total_count=total_count
+                    items=notifications, count=total_count
                 )
             except RepositoryDatabaseError as e:
                 logger.error(f"SQLAlchemy error: {e}")

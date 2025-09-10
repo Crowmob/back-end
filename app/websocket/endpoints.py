@@ -5,10 +5,10 @@ from starlette.websockets import WebSocketDisconnect
 
 from app.websocket.manager import get_manager, ConnectionManager
 
-router = APIRouter()
+websocket_router = APIRouter(tags=["Websocket"], prefix="/ws")
 
 
-@router.websocket("/ws/notifications/{user_id}")
+@websocket_router.websocket("/notifications/{user_id}")
 async def websocket_endpoint(
     websocket: WebSocket,
     user_id: int,

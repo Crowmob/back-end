@@ -16,3 +16,8 @@ class NotificationSchema(BaseModel):
 
 class NotificationDetailResponse(IDMixin, NotificationSchema, BaseModel):
     pass
+
+
+class GetAllNotificationsRequest(BaseModel):
+    limit: int
+    offset: int

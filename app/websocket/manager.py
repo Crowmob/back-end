@@ -1,4 +1,5 @@
 from fastapi import WebSocket
+from starlette.websockets import WebSocketDisconnect
 
 from app.services.membership import get_membership_service
 
@@ -12,10 +13,6 @@ class ConnectionManager:
         if user_id not in self.active_connections:
             self.active_connections[user_id] = []
         self.active_connections[user_id].append(websocket)
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.info(self.active_connections)
 
     def disconnect(self, user_id: int, websocket: WebSocket):
         if user_id in self.active_connections:
@@ -31,10 +28,19 @@ class ConnectionManager:
         membership_services = get_membership_service()
         users = await membership_services.get_users_in_company(company_id)
         for user in users.items:
-            if user.id in self.active_connections:
+            if user.id in self.active_connections.keys():
+                dead_connections = []
                 for connection in self.active_connections[user.id]:
-                    await connection.send_json(message)
+                    try:
+                        await connection.send_json(message)
+                    except WebSocketDisconnect:
+                        dead_connections.append(connection)
+                for dead_connection in dead_connections:
+                    self.disconnect(user.id, dead_connection)
+
+
+manager = ConnectionManager()
 
 
 def get_manager() -> ConnectionManager:
-    return ConnectionManager()
+    return manager
