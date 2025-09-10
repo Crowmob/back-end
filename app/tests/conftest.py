@@ -5,7 +5,9 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import insert
 
+from app.core.enums.enums import NotificationStatus
 from app.models.company_model import Company
+from app.models.notifications_model import Notification
 from app.models.quiz_model import (
     Answer,
     Question,
@@ -14,6 +16,7 @@ from app.models.quiz_model import (
     Records,
     SelectedAnswers,
 )
+from app.services.notification import get_notification_service
 from app.services.quiz import get_quiz_service
 from app.services.user import get_user_service
 from app.services.company import get_company_service
@@ -89,6 +92,17 @@ def quiz_services_fixture(db_session, redis_client, monkeypatch):
     monkeypatch.setattr("app.services.quiz.UnitOfWork", unit_of_work_with_session)
     monkeypatch.setattr("app.services.quiz.get_redis_client", lambda: redis_client)
     return get_quiz_service()
+
+
+@pytest.fixture
+def notification_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr(
+        "app.services.notification.UnitOfWork", unit_of_work_with_session
+    )
+    return get_notification_service()
 
 
 @pytest_asyncio.fixture
@@ -274,3 +288,18 @@ async def test_selected_answer(db_session, test_answers, test_record):
     )
     answer_id = result.one()[0]
     return {"id": answer_id, "record_id": test_record["id"]}
+
+
+@pytest_asyncio.fixture
+async def test_notification(db_session, test_user):
+    result = await db_session.execute(
+        insert(Notification)
+        .values(
+            status=NotificationStatus.UNREAD,
+            user_id=test_user["id"],
+            message="Test notification",
+        )
+        .returning(Notification.id)
+    )
+    notification_id = result.one()[0]
+    return {"id": notification_id, "user_id": test_user["id"]}
