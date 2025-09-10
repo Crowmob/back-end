@@ -178,8 +178,7 @@ class QuizServices:
             questions_to_updated = [
                 {
                     key: value
-                    for key, value in question.model_dump().items()
-                    if key != "action"
+                    for key, value in question.model_dump(exclude={"action"}).items()
                 }
                 for question in updated_questions
                 if question.action == QuizActions.update.value
@@ -187,8 +186,7 @@ class QuizServices:
             answers_to_update = [
                 {
                     key: value
-                    for key, value in answer.model_dump().items()
-                    if key != "action"
+                    for key, value in answer.model_dump(exclude={"action"}).items()
                 }
                 for answer in updated_answers
                 if answer.action == QuizActions.update.value
@@ -206,8 +204,7 @@ class QuizServices:
             questions_to_create = [
                 {
                     key: value
-                    for key, value in question.model_dump().items()
-                    if key not in {"action"}
+                    for key, value in question.model_dump(exclude={"action"}).items()
                 }
                 for question in updated_questions
                 if question.action == QuizActions.create.value
@@ -215,8 +212,7 @@ class QuizServices:
             answers_to_create = [
                 {
                     key: value
-                    for key, value in answer.model_dump().items()
-                    if key not in {"action"}
+                    for key, value in answer.model_dump(exclude={"action"}).items()
                 }
                 for answer in updated_answers
                 if answer.action == QuizActions.create.value
