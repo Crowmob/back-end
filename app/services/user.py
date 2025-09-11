@@ -185,7 +185,7 @@ class UserServices:
                 raise ForbiddenException(detail=f"You cannot delete another user")
             try:
                 await uow.users.update(
-                    user_id=user_id, data={"about": None, "has_profile": False}
+                    id=user_id, data={"about": None, "has_profile": False}
                 )
             except RepositoryIntegrityError as e:
                 logger.error(f"IntegrityError: {e}")
@@ -197,6 +197,16 @@ class UserServices:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise AppException(detail="Database exception occurred.")
             logger.info(f"User deleted: id={user_id}")
+
+    @staticmethod
+    async def get_users_with_quizzes_to_complete():
+        async with UnitOfWork() as uow:
+            try:
+                users = await uow.users.get_users_with_quizzes_to_complete()
+                return [UserDetailResponse.model_validate(user) for user in users]
+            except RepositoryDatabaseError as e:
+                logger.error(f"SQLAlchemyError: {e}")
+                raise AppException(detail="Database exception occurred.")
 
 
 def get_user_service() -> UserServices:
