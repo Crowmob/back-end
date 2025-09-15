@@ -15,6 +15,7 @@ from app.models.quiz_model import (
     Answer,
     SelectedAnswers,
 )
+from app.models.notifications_model import Notification
 from app.utils.settings_model import settings
 
 config = context.config

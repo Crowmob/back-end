@@ -5,7 +5,7 @@ from sqlite3 import IntegrityError, DataError
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.core.enums.enums import RoleEnum, QuizActions
+from app.core.enums.enums import RoleEnum, QuizActions, NotificationStatus
 from app.core.exceptions.exceptions import (
     AppException,
     NotFoundException,
@@ -24,6 +24,7 @@ from app.db.redis_init import get_redis_client
 from app.db.repositories.redis.quiz_redis_repository import QuizRedisRepository
 from app.db.unit_of_work import UnitOfWork
 from app.models.quiz_model import SelectedAnswers
+from app.schemas.notification import NotificationSchema
 from app.schemas.quiz import (
     QuizWithQuestionsSchema,
     QuestionCreateSchema,
@@ -45,16 +46,14 @@ from app.schemas.quiz import (
     UpdatedAnswerSchema,
 )
 from app.schemas.response_models import ListResponse
+from app.websocket.manager import get_manager
 
 logger = logging.getLogger(__name__)
 
 
 class QuizServices:
     @staticmethod
-    async def create_quiz(
-        company_id: int,
-        quiz: QuizWithQuestionsSchema,
-    ):
+    async def create_quiz(company_id: int, quiz: QuizWithQuestionsSchema):
         async with UnitOfWork() as uow:
             try:
                 quiz_id = await uow.quizzes.create(
@@ -84,6 +83,18 @@ class QuizServices:
                             ).model_dump()
                         )
                 await uow.answers.create_many(answers_data)
+
+                company = await uow.companies.get_one(id=company_id)
+                message = f"New test with name {quiz.title} has been added to company {company.name}"
+                await uow.notifications.create(
+                    NotificationSchema(
+                        status=NotificationStatus.UNREAD,
+                        company_id=company_id,
+                        message=message,
+                    ).model_dump()
+                )
+                manager = get_manager()
+                await manager.broadcast_to_company(company_id, {"message": message})
             except RepositoryIntegrityError as e:
                 logger.error(f"IntegrityError: {e}")
                 raise BadRequestException(detail="Failed to create quiz. Wrong data")
@@ -258,7 +269,7 @@ class QuizServices:
                 raise AppException(detail="Database exception occurred.")
             if not quiz:
                 raise NotFoundException(detail=f"Quiz with ID {quiz_id} not found")
-            await uow.quizzes.delete(quiz_id)
+            await uow.quizzes.delete(id=quiz_id)
             logger.info(f"Deleted quiz id: {quiz_id}")
 
     @staticmethod

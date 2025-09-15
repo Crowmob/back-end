@@ -16,3 +16,8 @@ class QuizActions(Enum):
     create = "create"
     update = "update"
     delete = "delete"
+
+
+class NotificationStatus(Enum):
+    READ = "read"
+    UNREAD = "unread"

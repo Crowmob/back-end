@@ -4,6 +4,7 @@ from app.db.postgres_init import async_session_maker
 from app.db.repositories.membership_requests_repository import (
     MembershipRequestsRepository,
 )
+from app.db.repositories.notification_repository import NotificationsRepository
 from app.db.repositories.quizzes.answer_repository import AnswerRepository
 from app.db.repositories.quizzes.participant_repository import QuizParticipantRepository
 from app.db.repositories.quizzes.question_repository import QuestionRepository
@@ -27,6 +28,7 @@ class UnitOfWork:
         self.answers = None
         self.participants = None
         self.records = None
+        self.notifications = None
 
     async def __aenter__(self):
         if self._external_session:
@@ -44,6 +46,7 @@ class UnitOfWork:
         self.answers = AnswerRepository(self.session)
         self.participants = QuizParticipantRepository(self.session)
         self.records = RecordsRepository(self.session)
+        self.notifications = NotificationsRepository(self.session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

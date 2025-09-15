@@ -96,12 +96,12 @@ class MembershipServices:
         request_type: str, user_id: int, company_id: int
     ):
         async with UnitOfWork() as uow:
-            membership_request = await uow.membership_requests.get_membership_request(
-                request_type, company_id, user_id
+            membership_request = await uow.membership_requests.get_one(
+                type=request_type, company_id=company_id, user_id=user_id
             )
             if membership_request is None:
                 raise NotFoundException(detail="Membership request not found")
-            await uow.membership_requests.delete_membership_request(user_id, company_id)
+            await uow.membership_requests.delete(user_id=user_id, company_id=company_id)
             membership = MembershipSchema(
                 role=RoleEnum.MEMBER.value,
                 user_id=user_id,
