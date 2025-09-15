@@ -1,0 +1,309 @@
+from datetime import datetime, timedelta
+
+import fakeredis
+import pytest
+import pytest_asyncio
+
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy import insert
+
+from app.core.enums.enums import NotificationStatus
+from app.models.company_model import Company
+from app.models.notifications_model import Notification
+from app.models.quiz_model import (
+    Answer,
+    Question,
+    Quiz,
+    QuizParticipant,
+    Records,
+    SelectedAnswers,
+)
+from app.services.notification import get_notification_service
+from app.services.quiz import get_quiz_service
+from app.services.user import get_user_service
+from app.services.company import get_company_service
+from app.db.unit_of_work import UnitOfWork
+from app.utils.settings_model import settings
+from app.models.user_model import User
+from app.models.membership_model import Memberships, MembershipRequests, RoleEnum
+from app.services.admin import get_admin_service
+from app.services.membership import get_membership_service
+from app.utils.db import clear_tables
+
+
+@pytest_asyncio.fixture
+async def db_session():
+    engine = create_async_engine(settings.db.get_url(settings.ENV), echo=False)
+    test_session_maker = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with test_session_maker() as session:
+        await clear_tables(session)
+        yield session
+        await session.rollback()
+
+
+@pytest_asyncio.fixture
+async def redis_client():
+    client = await fakeredis.aioredis.FakeRedis()
+    yield client
+    await client.aclose()
+
+
+@pytest.fixture
+def user_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr("app.services.user.UnitOfWork", unit_of_work_with_session)
+    return get_user_service()
+
+
+@pytest.fixture
+def company_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr("app.services.company.UnitOfWork", unit_of_work_with_session)
+    return get_company_service()
+
+
+@pytest.fixture
+def membership_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr("app.services.membership.UnitOfWork", unit_of_work_with_session)
+    return get_membership_service()
+
+
+@pytest.fixture
+def admin_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr("app.services.admin.UnitOfWork", unit_of_work_with_session)
+    return get_admin_service()
+
+
+@pytest.fixture
+def quiz_services_fixture(db_session, redis_client, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr("app.services.quiz.UnitOfWork", unit_of_work_with_session)
+    monkeypatch.setattr("app.services.quiz.get_redis_client", lambda: redis_client)
+    return get_quiz_service()
+
+
+@pytest.fixture
+def notification_services_fixture(db_session, monkeypatch):
+    def unit_of_work_with_session():
+        return UnitOfWork(session=db_session)
+
+    monkeypatch.setattr(
+        "app.services.notification.UnitOfWork", unit_of_work_with_session
+    )
+    return get_notification_service()
+
+
+@pytest_asyncio.fixture
+async def test_user(db_session):
+    result = await db_session.execute(
+        insert(User)
+        .values(username="test", email="test@example.com", password="1234")
+        .returning(User.id, User.email)
+    )
+    user_id, email = result.one()
+    await db_session.commit()
+    return {"id": user_id, "email": email}
+
+
+@pytest_asyncio.fixture
+async def test_company(db_session, test_user):
+    result = await db_session.execute(
+        insert(Company)
+        .values(owner=test_user["id"], name="test", description="test", private=False)
+        .returning(Company.id)
+    )
+    company_id = result.one()[0]
+    await db_session.commit()
+    return {"id": company_id, "owner": test_user["id"], "email": test_user["email"]}
+
+
+@pytest_asyncio.fixture
+async def test_membership_request(db_session, test_user, test_company):
+    result = await db_session.execute(
+        insert(MembershipRequests)
+        .values(type="request", user_id=test_user["id"], company_id=test_company["id"])
+        .returning(MembershipRequests.id)
+    )
+    membership_request_id = result.one()[0]
+    await db_session.commit()
+    return {
+        "id": membership_request_id,
+        "user_id": test_user["id"],
+        "company_id": test_company["id"],
+    }
+
+
+@pytest_asyncio.fixture
+async def test_membership(db_session, test_user, test_company):
+    result1 = await db_session.execute(
+        insert(Memberships)
+        .values(
+            user_id=test_user["id"], company_id=test_company["id"], role=RoleEnum.OWNER
+        )
+        .returning(Memberships.id)
+    )
+    membership1_id = result1.one()[0]
+    await db_session.commit()
+    return {
+        "id": membership1_id,
+        "user_id": test_user["id"],
+        "company_id": test_company["id"],
+        "owner": test_company["owner"],
+        "user_email": test_user["email"],
+    }
+
+
+@pytest_asyncio.fixture
+async def test_admin(db_session, test_company):
+    result = await db_session.execute(
+        insert(Memberships)
+        .values(
+            role=RoleEnum.ADMIN.value,
+            user_id=test_company["owner"],
+            company_id=test_company["id"],
+        )
+        .returning(Memberships.id)
+    )
+    membership_id = result.one()[0]
+    await db_session.commit()
+    return {
+        "id": membership_id,
+        "user_id": test_company["owner"],
+        "company_id": test_company["id"],
+    }
+
+
+@pytest_asyncio.fixture
+async def test_answers(db_session, test_questions):
+    res = {}
+    for i in range(2):
+        result = await db_session.execute(
+            insert(Answer)
+            .values(
+                text="Test answer",
+                is_correct=True,
+                question_id=test_questions["id1" if i == 0 else "id2"],
+            )
+            .returning(Answer.id)
+        )
+        answer_id1 = result.one()[0]
+        result = await db_session.execute(
+            insert(Answer)
+            .values(
+                text="Test answer",
+                is_correct=False,
+                question_id=test_questions["id1" if i == 0 else "id2"],
+            )
+            .returning(Answer.id)
+        )
+        answer_id2 = result.one()[0]
+        res[f"id{i * 2 + 1}"] = answer_id1
+        res[f"id{i * 2 + 2}"] = answer_id2
+    res["question_id1"] = test_questions["id1"]
+    res["question_id2"] = test_questions["id2"]
+    return res
+
+
+@pytest_asyncio.fixture
+async def test_questions(db_session, test_quiz):
+    result = await db_session.execute(
+        insert(Question)
+        .values(text="Test question", quiz_id=test_quiz["id"])
+        .returning(Question.id)
+    )
+    question_id1 = result.one()[0]
+    result = await db_session.execute(
+        insert(Question)
+        .values(text="Test question", quiz_id=test_quiz["id"])
+        .returning(Question.id)
+    )
+    question_id2 = result.one()[0]
+    return {"quiz_id": test_quiz["id"], "id1": question_id1, "id2": question_id2}
+
+
+@pytest_asyncio.fixture
+async def test_quiz(db_session, test_company):
+    result = await db_session.execute(
+        insert(Quiz)
+        .values(
+            title="Test quiz",
+            description="Test quiz",
+            company_id=test_company["id"],
+            frequency=1,
+        )
+        .returning(Quiz.id)
+    )
+    quiz_id = result.one()[0]
+    return {
+        "id": quiz_id,
+        "company_id": test_company["id"],
+        "user_id": test_company["owner"],
+        "user_email": test_company["email"],
+    }
+
+
+@pytest_asyncio.fixture
+async def test_participant(db_session, test_quiz, test_user):
+    result = await db_session.execute(
+        insert(QuizParticipant)
+        .values(
+            user_id=test_user["id"],
+            quiz_id=test_quiz["id"],
+            completed_at=datetime.now() - timedelta(days=1),
+        )
+        .returning(QuizParticipant.id)
+    )
+    participant_id = result.one()[0]
+    return {"id": participant_id, "quiz_id": test_quiz["id"]}
+
+
+@pytest_asyncio.fixture
+async def test_record(db_session, test_participant):
+    result = await db_session.execute(
+        insert(Records)
+        .values(participant_id=test_participant["id"], score=1)
+        .returning(Records.id)
+    )
+    record_id = result.one()[0]
+    return {"id": record_id, "participant_id": test_participant["id"]}
+
+
+@pytest_asyncio.fixture
+async def test_selected_answer(db_session, test_answers, test_record):
+    result = await db_session.execute(
+        insert(SelectedAnswers)
+        .values(record_id=test_record["id"], answer_id=test_answers["id1"])
+        .returning(SelectedAnswers.id)
+    )
+    answer_id = result.one()[0]
+    return {"id": answer_id, "record_id": test_record["id"]}
+
+
+@pytest_asyncio.fixture
+async def test_notification(db_session, test_membership):
+    result = await db_session.execute(
+        insert(Notification)
+        .values(
+            status=NotificationStatus.UNREAD,
+            user_id=test_membership["user_id"],
+            company_id=test_membership["company_id"],
+            message="Test notification",
+        )
+        .returning(Notification.id)
+    )
+    notification_id = result.one()[0]
+    return {"id": notification_id, "user_id": test_membership["user_id"]}

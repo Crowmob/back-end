@@ -1,0 +1,7 @@
+venv
+.env
+.pytest_cache
+.idea
+__pycache__
+logs
+static

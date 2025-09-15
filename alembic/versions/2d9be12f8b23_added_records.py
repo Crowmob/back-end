@@ -1,0 +1,37 @@
+"""added records
+
+Revision ID: 2d9be12f8b23
+Revises: 591c648ab3c1
+Create Date: 2025-08-22 14:23:31.923069
+
+"""
+
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+revision: str = "2d9be12f8b23"
+down_revision: Union[str, Sequence[str], None] = "591c648ab3c1"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "records",
+        sa.Column("score", sa.Integer(), nullable=False),
+        sa.Column("participant_id", sa.Integer(), nullable=False),
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["participant_id"], ["quiz_participants.id"], ondelete="CASCADE"
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(op.f("ix_records_id"), "records", ["id"], unique=False)
+
+
+def downgrade() -> None:
+    op.drop_index(op.f("ix_records_id"), table_name="records")
+    op.drop_table("records")

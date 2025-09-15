@@ -1,0 +1,173 @@
+from datetime import datetime, date
+
+from pydantic import BaseModel, ConfigDict, model_validator
+
+from app.core.exceptions.exceptions import BadRequestException
+from app.schemas.base import IDMixin
+
+
+class QuizSchema(BaseModel):
+    title: str
+    description: str
+    frequency: int
+
+
+class QuestionSchema(BaseModel):
+    text: str
+
+
+class AnswerSchema(BaseModel):
+    text: str
+    is_correct: bool
+
+
+class QuizParticipantSchema(BaseModel):
+    quiz_id: int
+    user_id: int
+    completed_at: datetime
+
+
+class QuestionWithAnswersSchema(QuestionSchema, BaseModel):
+    answers: list[AnswerSchema]
+
+    @model_validator(mode="after")
+    def validate_answers(self) -> "QuestionWithAnswersSchema":
+        if not (2 <= len(self.answers) <= 4):
+            raise BadRequestException(
+                detail="Number of answers in question must be more than 1 and less than 5"
+            )
+        return self
+
+
+class QuizWithQuestionsSchema(QuizSchema, BaseModel):
+    questions: list[QuestionWithAnswersSchema]
+
+    @model_validator(mode="after")
+    def validate_questions(self) -> "QuizWithQuestionsSchema":
+        if len(self.questions) < 2:
+            raise BadRequestException(detail="Quiz should have at least 2 questions")
+        return self
+
+
+class QuestionDetailResponse(IDMixin, QuestionSchema, BaseModel):
+    pass
+
+
+class QuizDetailResponse(IDMixin, QuizSchema, BaseModel):
+    is_available: bool
+    last_completed_at: datetime = None
+
+
+class AnswerDetailResponse(IDMixin, AnswerSchema, BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class QuestionWithAnswersDetailResponse(IDMixin, QuestionSchema, BaseModel):
+    answers: list[AnswerDetailResponse]
+
+
+class QuizWithQuestionsDetailResponse(IDMixin, QuizSchema, BaseModel):
+    questions: list[QuestionWithAnswersDetailResponse]
+
+
+class QuizParticipantDetailResponse(IDMixin, QuizParticipantSchema, BaseModel):
+    model_config = {"from_attributes": True}
+
+
+class QuizCreateSchema(QuizSchema, BaseModel):
+    company_id: int
+
+
+class QuestionCreateSchema(QuestionSchema, BaseModel):
+    quiz_id: int
+
+
+class AnswerCreateSchema(AnswerSchema, BaseModel):
+    question_id: int
+
+
+class QuizParticipantCreateSchema(BaseModel):
+    quiz_id: int
+    user_id: int
+
+
+class RecordCreateSchema(BaseModel):
+    participant_id: int
+    score: int
+
+
+class QuizUpdateSchema(BaseModel):
+    title: str
+    description: str
+    frequency: int
+
+
+class QuestionUpdateSchema(BaseModel):
+    text: str | None = None
+
+
+class AnswerUpdateSchema(BaseModel):
+    text: str | None = None
+    is_correct: bool | None = None
+
+
+class QuizParticipantUpdateSchema(BaseModel):
+    completed_at: datetime | None = None
+
+
+class GetAllQuizzesRequest(BaseModel):
+    company_id: int | None = None
+    limit: int | None = None
+    offset: int | None = None
+
+
+class AllQuizzesResponse(BaseModel):
+    quizzes: list[QuizDetailResponse]
+
+
+class AnswerID(IDMixin, BaseModel):
+    pass
+
+
+class QuestionID(IDMixin, BaseModel):
+    answers: list[AnswerID]
+
+
+class QuizSubmitRequest(BaseModel):
+    score: int
+    quiz_id: int
+    user_id: int
+    company_id: int
+    questions: list[QuestionID]
+
+
+class QuizScoreItem(BaseModel):
+    title: str
+    description: str | None = None
+    average_score: float
+    completed_at: datetime
+
+
+class QuizAverageResponse(BaseModel):
+    overall_average: float
+    scores: list[QuizScoreItem]
+
+
+class QuizAverageRequest(BaseModel):
+    from_date: date | None = None
+    till_date: date | None = None
+
+
+class UpdatedQuestionSchema(IDMixin, QuestionSchema, BaseModel):
+    action: str
+    quiz_id: int
+
+
+class UpdatedAnswerSchema(IDMixin, AnswerSchema, BaseModel):
+    action: str
+    question_id: int
+
+
+class QuizUpdateRequest(QuizSchema, BaseModel):
+    updated_questions: list[UpdatedQuestionSchema]
+    updated_answers: list[UpdatedAnswerSchema]

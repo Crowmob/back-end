@@ -1,0 +1,23 @@
+from enum import Enum
+
+
+class RoleEnum(Enum):
+    MEMBER = "MEMBER"
+    ADMIN = "ADMIN"
+    OWNER = "OWNER"
+
+
+class FileFormat(Enum):
+    CSV = "csv"
+    JSON = "json"
+
+
+class QuizActions(Enum):
+    create = "create"
+    update = "update"
+    delete = "delete"
+
+
+class NotificationStatus(Enum):
+    READ = "read"
+    UNREAD = "unread"
