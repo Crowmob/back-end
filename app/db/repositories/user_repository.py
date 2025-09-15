@@ -1,10 +1,13 @@
 import logging
+from datetime import datetime, timedelta
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.core.enums.enums import RoleEnum
+from app.core.exceptions.repository_exceptions import RepositoryDatabaseError
 from app.models.quiz_model import QuizParticipant
 from app.models.user_model import User
 from app.models.membership_model import Memberships
@@ -68,3 +71,30 @@ class UserRepository(BaseRepository[User]):
         )
 
         return items, total_count
+
+    async def get_users_with_quizzes_to_complete(self):
+        try:
+            one_day_ago = datetime.utcnow() - timedelta(days=1)
+            start_of_day = one_day_ago.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            end_of_day = one_day_ago.replace(
+                hour=23, minute=59, second=59, microsecond=999999
+            )
+
+            stmt = (
+                select(User)
+                .outerjoin(QuizParticipant, QuizParticipant.user_id == User.id)
+                .where(
+                    or_(
+                        QuizParticipant.completed_at.between(start_of_day, end_of_day),
+                        QuizParticipant.id.is_(None),
+                    )
+                )
+            )
+
+            result = await self.session.execute(stmt)
+            users = result.scalars().unique().all()
+            return users
+        except SQLAlchemyError as e:
+            raise RepositoryDatabaseError(f"Database error: {e}") from e

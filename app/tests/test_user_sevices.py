@@ -78,3 +78,11 @@ async def test_delete_user(db_session, user_services_fixture, test_user):
 
     user = await db_session.scalar(select(User).where(User.id == test_user["id"]))
     assert user.has_profile is False
+
+
+@pytest.mark.asyncio
+async def test_get_users_with_quizzes_to_complete(
+    test_participant, user_services_fixture
+):
+    users = await user_services_fixture.get_users_with_quizzes_to_complete()
+    assert len(users) == 1

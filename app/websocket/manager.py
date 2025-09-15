@@ -1,6 +1,7 @@
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+from app.schemas.user import UserDetailResponse
 from app.services.membership import get_membership_service
 
 
@@ -28,6 +29,20 @@ class ConnectionManager:
         membership_services = get_membership_service()
         users = await membership_services.get_users_in_company(company_id)
         for user in users.items:
+            if user.id in self.active_connections.keys():
+                dead_connections = []
+                for connection in self.active_connections[user.id]:
+                    try:
+                        await connection.send_json(message)
+                    except WebSocketDisconnect:
+                        dead_connections.append(connection)
+                for dead_connection in dead_connections:
+                    self.disconnect(user.id, dead_connection)
+
+    async def broadcast_to_users_with_quizzes_to_complete(
+        self, users: list[UserDetailResponse], message: dict
+    ):
+        for user in users:
             if user.id in self.active_connections.keys():
                 dead_connections = []
                 for connection in self.active_connections[user.id]:

@@ -47,7 +47,7 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
         ],
     )
     quiz_id = await quiz_services_fixture.create_quiz(
-        company_id=test_company["id"], quiz_id="null", quiz=quiz1
+        company_id=test_company["id"], quiz=quiz1
     )
     assert isinstance(quiz_id, int)
 
@@ -66,7 +66,12 @@ async def test_get_all_quizzes(db_session, quiz_services_fixture, test_quiz):
 @pytest.mark.asyncio
 async def test_update_quiz(db_session, quiz_services_fixture, test_quiz):
     await quiz_services_fixture.update_quiz(
-        quiz_id=test_quiz["id"], title="Test Title 2", description="Test Description 2"
+        quiz_id=test_quiz["id"],
+        title="Test Title 2",
+        description="Test Description 2",
+        frequency=1,
+        updated_answers=[],
+        updated_questions=[],
     )
     quiz = await db_session.scalar(select(Quiz).where(Quiz.id == test_quiz["id"]))
     assert quiz.title == "Test Title 2"

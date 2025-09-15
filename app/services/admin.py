@@ -27,7 +27,7 @@ class AdminServices:
     async def appoint_admin(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
             try:
-                result = await uow.memberships.update(
+                await uow.memberships.update(
                     user_id=user_id,
                     company_id=company_id,
                     data={"role": RoleEnum.ADMIN},
@@ -41,17 +41,13 @@ class AdminServices:
             except RepositoryDatabaseError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise AppException(detail="Database exception occurred.")
-            if not result.rowcount:
-                raise NotFoundException(
-                    detail=f"User with id {user_id} is not member of company with id {company_id}"
-                )
             logger.info(f"Appointed admin with id {user_id}")
 
     @staticmethod
     async def remove_admin(user_id: int, company_id: int):
         async with UnitOfWork() as uow:
             try:
-                result = await uow.memberships.update(
+                await uow.memberships.update(
                     user_id=user_id,
                     company_id=company_id,
                     data={"role": RoleEnum.MEMBER},
@@ -65,10 +61,6 @@ class AdminServices:
             except RepositoryDatabaseError as e:
                 logger.error(f"SQLAlchemyError: {e}")
                 raise AppException(detail="Database exception occurred.")
-            if not result.rowcount:
-                raise NotFoundException(
-                    detail=f"User with id {user_id} is not member of company with id {company_id}"
-                )
             logger.info(f"Removed admin with id {user_id}")
 
     @staticmethod
@@ -91,12 +83,12 @@ class AdminServices:
                     username=user.username,
                     email=user.email,
                     about=user.about,
-                    role=role,
+                    role=user.role,
                     avatar=f"{settings.BASE_URL}/static/avatars/{user.id}.{user.avatar_ext}"
                     if user.avatar_ext
                     else None,
                 )
-                for user, role in items
+                for user in items
             ]
             logger.info(items)
             return ListResponse[MemberDetailResponse](items=items, count=total_count)

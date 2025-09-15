@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import fakeredis
 import pytest
 import pytest_asyncio
@@ -147,17 +149,17 @@ async def test_membership_request(db_session, test_user, test_company):
 
 @pytest_asyncio.fixture
 async def test_membership(db_session, test_user, test_company):
-    result = await db_session.execute(
+    result1 = await db_session.execute(
         insert(Memberships)
         .values(
             user_id=test_user["id"], company_id=test_company["id"], role=RoleEnum.OWNER
         )
         .returning(Memberships.id)
     )
-    membership_id = result.one()[0]
+    membership1_id = result1.one()[0]
     await db_session.commit()
     return {
-        "id": membership_id,
+        "id": membership1_id,
         "user_id": test_user["id"],
         "company_id": test_company["id"],
         "owner": test_company["owner"],
@@ -261,6 +263,7 @@ async def test_participant(db_session, test_quiz, test_user):
         .values(
             user_id=test_user["id"],
             quiz_id=test_quiz["id"],
+            completed_at=datetime.now() - timedelta(days=1),
         )
         .returning(QuizParticipant.id)
     )
@@ -291,15 +294,16 @@ async def test_selected_answer(db_session, test_answers, test_record):
 
 
 @pytest_asyncio.fixture
-async def test_notification(db_session, test_user):
+async def test_notification(db_session, test_membership):
     result = await db_session.execute(
         insert(Notification)
         .values(
             status=NotificationStatus.UNREAD,
-            user_id=test_user["id"],
+            user_id=test_membership["user_id"],
+            company_id=test_membership["company_id"],
             message="Test notification",
         )
         .returning(Notification.id)
     )
     notification_id = result.one()[0]
-    return {"id": notification_id, "user_id": test_user["id"]}
+    return {"id": notification_id, "user_id": test_membership["user_id"]}

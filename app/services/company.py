@@ -182,7 +182,7 @@ class CompanyServices:
             await self.get_company_by_id_with_uow(
                 company_id, uow, current_user_id, current_user_email
             )
-            await uow.companies.delete(company_id)
+            await uow.companies.delete(id=company_id)
             logger.info(f"Company deleted: id={company_id}")
 
 

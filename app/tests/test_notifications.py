@@ -6,11 +6,13 @@ from app.models.notifications_model import Notification
 
 
 @pytest.mark.asyncio
-async def test_get_all_notifications(notification_services_fixture, test_notification):
+async def test_get_all_notifications(
+    db_session, notification_services_fixture, test_notification
+):
     notifications = await notification_services_fixture.get_all_notifications(
-        test_notification["user_id"]
+        user_id=test_notification["user_id"], limit=5, offset=0
     )
-    assert len(notifications.items) >= 1
+    assert notifications.count >= 1
 
 
 @pytest.mark.asyncio
