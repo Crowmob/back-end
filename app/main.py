@@ -12,7 +12,7 @@ from app.routers.auth_router import auth_router
 from app.routers.company_router import company_router
 from app.routers.membership_router import membership_router
 from app.utils.settings_model import settings
-from app.websocket.endpoints import websocket_router
+from app.routers.websocket_router import websocket_router
 from jobs.scheduler import scheduler
 
 app = FastAPI(version="1.0", description="Internship project")

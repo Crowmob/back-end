@@ -43,7 +43,6 @@ class BaseRedisRepository(ABC):
             except RedisError as e:
                 raise RedisRepositoryScanError(f"Redis scan error: {e}") from e
             keys.extend(found_keys)
-            logger.info(cursor)
             if cursor in [0, b"0"]:
                 break
 

@@ -12,6 +12,7 @@ from app.schemas.quiz import (
     QuestionID,
     AnswerID,
     AnswerDetailResponse,
+    QuizWithQuestionsDetailResponse,
 )
 from app.models.quiz_model import (
     Quiz,
@@ -50,6 +51,14 @@ async def test_create_quiz(db_session, quiz_services_fixture, test_company):
         company_id=test_company["id"], quiz=quiz1
     )
     assert isinstance(quiz_id, int)
+
+
+@pytest.mark.asyncio
+async def test_get_quiz_by_id(db_session, quiz_services_fixture, test_quiz):
+    quiz = await quiz_services_fixture.get_quiz_by_id(
+        test_quiz["id"], test_quiz["company_id"]
+    )
+    assert isinstance(quiz, QuizWithQuestionsDetailResponse)
 
 
 @pytest.mark.asyncio

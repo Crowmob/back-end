@@ -13,10 +13,10 @@ class Notification(IDMixin, TimestampMixin, Base):
         nullable=False,
         default=NotificationStatus.UNREAD,
     )
-    user_id: Mapped[int] = mapped_column(
+    user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True
     )
-    company_id: Mapped[int] = mapped_column(
+    company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="CASCADE"), nullable=True
     )
-    message: Mapped[str] = mapped_column(String(512), nullable=True)
+    message: Mapped[str | None] = mapped_column(String(512), nullable=True)
